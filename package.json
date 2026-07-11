@@ -1,0 +1,26 @@
+{
+  "name": "hiraeth",
+  "private": true,
+  "version": "0.1.0",
+  "description": "HIRAETH — a first-person dreamcore puzzle game in ten rooms",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/edward-sia/dreamcore.git"
+  },
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "shot": "node tools/screenshot.mjs",
+    "playtest": "node tools/playtest.mjs"
+  },
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.61.1",
+    "vite": "^5.4.21"
+  }
+}

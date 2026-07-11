@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HIRAETH — a dream in ten rooms</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#127769;</text></svg>" />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- In-game HUD -->
+  <div id="hud" class="hidden">
+    <div id="crosshair"></div>
+    <div id="prompt" class="hidden"></div>
+    <div id="objective"></div>
+    <div id="items"></div>
+    <div id="subtitle" class="hidden"></div>
+    <div id="hint-keys">WASD — walk&ensp;·&ensp;E — touch&ensp;·&ensp;J — remember&ensp;·&ensp;Esc — pause</div>
+  </div>
+
+  <!-- Note / clue paper -->
+  <div id="note-overlay" class="overlay hidden">
+    <div id="note-paper">
+      <div id="note-title"></div>
+      <div id="note-body"></div>
+      <div class="overlay-hint">E or click to put it down</div>
+    </div>
+  </div>
+
+  <!-- Journal of collected clues -->
+  <div id="journal" class="overlay hidden">
+    <div id="journal-inner">
+      <div class="journal-heading">things you remember</div>
+      <div id="journal-entries"></div>
+      <div class="overlay-hint">J to close</div>
+    </div>
+  </div>
+
+  <!-- Keypad / combination input -->
+  <div id="keypad" class="overlay hidden">
+    <div id="keypad-inner">
+      <div id="keypad-label"></div>
+      <div id="keypad-display"></div>
+      <div id="keypad-grid"></div>
+      <div class="overlay-hint">Esc to step away</div>
+    </div>
+  </div>
+
+  <!-- Fade + title card + interlude -->
+  <div id="fade"></div>
+  <div id="titlecard" class="hidden">
+    <div id="titlecard-num"></div>
+    <div id="titlecard-name"></div>
+  </div>
+  <div id="interlude" class="hidden">
+    <div id="interlude-text"></div>
+    <div id="interlude-continue">press any key</div>
+  </div>
+
+  <!-- Main menu -->
+  <div id="menu">
+    <div class="menu-grain"></div>
+    <div id="menu-inner">
+      <div id="menu-title">H&thinsp;I&thinsp;R&thinsp;A&thinsp;E&thinsp;T&thinsp;H</div>
+      <div id="menu-sub">a dream in ten rooms</div>
+      <div id="menu-buttons">
+        <button id="btn-continue" class="menu-btn">continue</button>
+        <button id="btn-new" class="menu-btn">begin again</button>
+        <button id="btn-levels" class="menu-btn">rooms</button>
+        <button id="btn-settings" class="menu-btn">settings</button>
+      </div>
+      <div id="menu-levels" class="hidden"></div>
+      <div id="menu-settings" class="hidden">
+        <label>look sensitivity <input id="set-sens" type="range" min="0.2" max="2.5" step="0.1" /></label>
+        <label>volume <input id="set-vol" type="range" min="0" max="1" step="0.05" /></label>
+        <label class="check"><input id="set-quality" type="checkbox" /> soft light (bloom)</label>
+        <button id="btn-back" class="menu-btn small">back</button>
+      </div>
+      <div id="menu-footer">headphones recommended &ensp;·&ensp; nothing here will hurt you</div>
+    </div>
+  </div>
+
+  <!-- Pause -->
+  <div id="pause" class="overlay hidden">
+    <div id="pause-inner">
+      <div class="pause-heading">you surface for a moment</div>
+      <button id="btn-resume" class="menu-btn">sink back</button>
+      <button id="btn-quit" class="menu-btn small">wake to menu</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
