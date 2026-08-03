@@ -120,29 +120,47 @@ shelves, freezers still humming, checkout lane 3 lit. ~4 minutes.
 The house itself, rebuilt: dark hallway, sitting room, kitchen. Rain
 against the windows, a stopped clock. ~5 minutes.
 
-- The house is unlit; the fuse box in the kitchen has four labelled
-  switches (kitchen, hall, sitting room, your room).
-- M.'s note (visible by the fuse box's pilot light): she turned the
-  lights on the same way every evening — kitchen first, then the hall,
-  then the sitting room, and yours last, so you'd come down to a house
-  already warm.
-- Flip the switches in that order; each one lights its room in turn
-  (the payoff is watching the house come on room by room). A wrong
-  order clicks everything off again: `wrong` + a nudge.
-- The lit kitchen reveals a small key on the table; it opens the door
-  at the top of the stairs. Light spills under it. Threshold completes.
+**Difficulty note: from here on the puzzles are tuned for adults —
+clues are indirect, and mapping them onto the world is the work.**
+
+- The house is unlit; the fuse box in the kitchen has five labelled
+  switches: kitchen, hall, sitting room, your room — and porch, which
+  only ever answers with a dead click (the porch light died in III;
+  players who notice will smile).
+- M.'s note by the fuse box's pilot light does NOT name an order. It
+  remembers an evening: "supper before slippers. slippers before the
+  wireless. and yours always last, so the dark never caught you."
+  The player must map supper → kitchen, slippers → the hall mat,
+  the wireless → the sitting room radio; each association is
+  physically present in its room (a burnt pan, slippers by the door,
+  a humming radio set) for anyone who walks the dark house first.
+- Flip the four live switches in that order; each lights its room in
+  turn (the payoff is the house coming on room by room). A wrong order
+  clicks everything back off: `wrong` + "that was not how the evening
+  went." The porch switch never counts as wrong — it is simply dead.
+- Only in the LIT kitchen does the small key on the table become
+  findable (visible + interactable once powered); it opens the door at
+  the top of the stairs. Light spills under it. Threshold completes.
 
 ### VI — The Field (`field`)
 
 The field behind the last houses, at night. Grass to the knees, one
-dead tree, a fence line, wind. Fireflies. ~6 minutes.
+dead tree, a fence line running the far edge, a rusted bathtub the
+horses drank from, wind. Fireflies. ~6 minutes.
 
-- A scarecrow wears M.'s note in its coat pocket: the tin was buried
-  "past the tree, toward the fallen star, where the grass gives up."
-- A low glow sits on the horizon (the fallen star). Walking the line
-  from the dead tree toward it finds a bare mound (a subtle circle of
-  dirt among grass; fireflies cluster over it).
-- Dig (interact) → a rusted tin → inside, a small key and a ribbon.
+- The scarecrow wears M.'s note in its coat pocket — a rhyme you two
+  buried treasure by: "from the tree that died the summer you were
+  eight, / toward the star that fell, / past where the horses drank, /
+  then thirteen posts along the wire, / and look down."
+- Executing it is the puzzle: sight the low horizon glow (the fallen
+  star) from the dead tree, pass the bathtub, reach the fence, then
+  COUNT thirteen fence posts along it. At the thirteenth post's foot
+  is a bare mound. Nothing marks it but the counting.
+- Decoys cost time, gently: two or three other bare patches in the
+  field can be dug — "only earth, and the smell of rain" — and digging
+  at the wrong post says "you counted wrong, or the field did."
+- Dig at the right mound → a rusted tin → inside, a small key and a
+  ribbon (keep the ribbon as flavour: "hers").
 - The key opens the padlocked gate in the fence. "the gate never kept
   anything in." Walk through into the dark — threshold completes.
 
@@ -152,12 +170,21 @@ A rural station at night, fog swallowing the tracks both ways.
 Departures board, shuttered ticket office, waiting room, underpass.
 ~7 minutes. Multi-stage.
 
-1. In the waiting room, a torn ticket: the **23:47**, destination
-   smudged ("H——"), carriage 3, seat 41. The departures board lists
-   four trains — three DELAYED, the 23:47 marked platform 2.
-2. The underpass to platform 2 is gated; its keypad takes carriage +
-   seat: **341**. Wrong: `wrong` + "carriage, then seat. you memorised
-   it so you wouldn't have to look."
+1. In the waiting room, a torn ticket: time smudged to **23:4—**,
+   destination smudged to **H——**, but **carriage 3, seat 41** legible
+   — plus decoy numbers that fit a keypad just as well (ticket
+   No. 1147, fare 2.35). The departures board lists five trains
+   (23:12 ASHFELD · 23:31 HOLLOW BECK · 23:47 HARBECK · 23:58
+   ASHFELD · 00:06 MOORCROFT), platforms 1 and 2 mixed. Only ONE
+   departure matches both fragments — 23:4— **and** H—— → the 23:47
+   HARBECK, platform 2. (23:31 HOLLOW BECK matches the H but not the
+   time; 23:58 matches neither; the board says so to whoever reads
+   carefully.)
+2. The underpass to platform 2 is gated, keypad labelled only
+   "staff gate". A weathered staff notice inside the waiting room:
+   "gate code is carriage then seat of the last service you rode."
+   The stub IS the last service → **341**. Wrong (e.g. 147 or 235 from
+   the decoys): `wrong` + "that number never mattered."
 3. On platform 2, wait at the marked line. The rails begin to sing, a
    light grows in the fog, and the train passes without stopping — a
    wall of light and rumble and wind. When it has gone, the board
@@ -171,12 +198,17 @@ poster frames, dark auditorium, projection booth. ~8 minutes.
 Multi-stage.
 
 1. The ticket booth holds a stub: **row F, seat 8**. In the
-   auditorium, rows A–H of seats; finding F8 (letters on row-ends)
-   yields the booth key left on the cushion.
-2. The lobby poster: *The Long Summer* — **1974** — "one week only."
-   In the booth, film canisters are labelled by year (1962, 1968,
-   1974, 1981); mounting the wrong one: `wrong` + "that wasn't the
-   summer." Mounting 1974 starts the projector.
+   auditorium the row-end letter plates are mostly worn blank — only
+   A, C, E and H survive — so finding F means counting the dark rows
+   between E and H. Under F8's cushion, a key tagged "relief
+   projectionist" opens the booth.
+2. The lobby holds several posters with years (decoys: *Harvest
+   Moon* 1962 · *The Tin Orchard* 1968 · *The Long Summer* 1974 ·
+   *Winter Sisters* 1981), but only one is "the film you can't
+   remember": the stub's torn edge carries the tail of its title
+   ("—g summer"). In the booth, canisters are labelled by year only.
+   Mounting the wrong reel: grey leader rattles through, `wrong` +
+   "that wasn't the summer." Mounting **1974** starts the projector.
 3. The screen fills with silver light (emissive plane brightens; the
    auditorium warms). The fire-exit door beside the screen — locked
    until now — clicks open. Walking into the light behind it completes.
@@ -190,9 +222,12 @@ minutes. The cross-reference summit.
 - Eight boxes, labelled: the hallway, the pool, the street, the
   supermarket, the house, the field, the platform, the theater. Each
   holds an index card — a short sad memory plus one hard fact (the
-  facts in **Canon**). Some boxes are misfiled or on the high shelf
-  (ladder), one card has slipped behind the shelving (visible through
-  a gap; retrieved at floor level nearby).
+  facts in **Canon**). But the archive is imperfect: at least two
+  cards are MISFILED (the pool's card rests in the theater's box, and
+  vice versa — the filer was tired), some boxes sit on the high shelf
+  (ladder), and one card has slipped behind the shelving (visible
+  through a gap; retrieved at floor level nearby). Reading only the
+  boxes you "need" is not enough; the room rewards reading everything.
 - On the reading table, the master card:
   "what the records agree on — / how deep the water finally went /
   the aisle that faced the sun / the carriage you always chose /
