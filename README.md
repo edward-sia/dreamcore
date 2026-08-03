@@ -51,7 +51,9 @@ rooms that came before.
   AABB collision, raycast interaction, notes/journal/keypad UI, ambience
   engine, save system.
 - **Levels:** `src/levels/Level01.js … Level10.js`, auto-discovered. The
-  authoring contract lives in [`docs/LEVEL_API.md`](docs/LEVEL_API.md).
+  authoring contract lives in [`docs/LEVEL_API.md`](docs/LEVEL_API.md);
+  the room-by-room design bible (all puzzles spoiled) is
+  [`docs/DESIGN.md`](docs/DESIGN.md).
 
 ## Testing
 
