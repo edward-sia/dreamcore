@@ -1,16 +1,20 @@
-// Leaderboard server contract test: boots server/server.mjs on a scratch
-// port + data dir and exercises the API end-to-end.
+// Leaderboard contract test. By default boots server/server.mjs on a
+// scratch port + data dir; set LB_TEST_URL to point at any other
+// implementation of the same API (e.g. `wrangler dev` for the Worker)
+// with a FRESH, empty store.
 //   node tools/leaderboard-test.mjs
+//   LB_TEST_URL=http://127.0.0.1:8787 node tools/leaderboard-test.mjs
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
+const external = process.env.LB_TEST_URL ?? null;
 const PORT = 18000 + Math.floor(Math.random() * 2000);
-const URL = `http://127.0.0.1:${PORT}`;
-const dataDir = mkdtempSync(path.join(tmpdir(), 'hiraeth-lb-'));
+const URL = external ? external.replace(/\/+$/, '') : `http://127.0.0.1:${PORT}`;
+const dataDir = external ? null : mkdtempSync(path.join(tmpdir(), 'hiraeth-lb-'));
 
-const child = spawn(process.execPath, ['server/server.mjs'], {
+const child = external ? null : spawn(process.execPath, ['server/server.mjs'], {
   env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR: dataDir, STATIC_DIR: '' },
   stdio: ['ignore', 'pipe', 'inherit'],
 });
@@ -105,7 +109,7 @@ try {
   console.error('  FAIL — unexpected error:', err.message);
 }
 
-child.kill('SIGTERM');
-rmSync(dataDir, { recursive: true, force: true });
+child?.kill('SIGTERM');
+if (dataDir) rmSync(dataDir, { recursive: true, force: true });
 console.log(failures ? `\n${failures} failure(s)` : '\nall leaderboard checks passed');
 process.exit(failures ? 1 : 0);

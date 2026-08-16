@@ -25,6 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
+import { sanitizeName, sanitizeTimes, validKey, mergeTimes, levelsOf as levelsOfTimes, totalOf as totalOfTimes, compareEntries } from './contract.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const PORT = parseInt(process.env.PORT ?? '8091', 10);
@@ -40,8 +41,6 @@ const TRUST_PROXY = (process.env.TRUST_PROXY ?? '1') === '1';
 
 const DATA_FILE = path.join(DATA_DIR, 'leaderboard.json');
 const MAX_BODY = 8 * 1024;
-const MIN_ROOM_SECONDS = 1;
-const MAX_ROOM_SECONDS = 86400;
 const RATE = { GET: 120, POST: 30 }; // requests per minute per ip
 
 // ---------- store ----------
@@ -78,41 +77,12 @@ function saveNow() {
   }
 }
 
-const levelsOf = (e) => Object.keys(e.times).length;
-const totalOf = (e) => Object.values(e.times).reduce((a, b) => a + b, 0);
+const levelsOf = (e) => levelsOfTimes(e.times);
+const totalOf = (e) => totalOfTimes(e.times);
 
 function ranked() {
-  return [...entries.values()].sort((a, b) =>
-    levelsOf(b) - levelsOf(a) || totalOf(a) - totalOf(b) || a.updated - b.updated
-  );
+  return [...entries.values()].sort(compareEntries);
 }
-
-// ---------- validation ----------
-
-function sanitizeName(name) {
-  if (typeof name !== 'string') return null;
-  const clean = name.normalize('NFC').replace(/\p{C}/gu, '').replace(/\s+/g, ' ').trim().slice(0, 24);
-  return clean.length ? clean : null;
-}
-
-function sanitizeTimes(times) {
-  if (typeof times !== 'object' || times === null || Array.isArray(times)) return null;
-  const out = {};
-  const keys = Object.keys(times);
-  if (keys.length === 0 || keys.length > MAX_LEVEL) return null;
-  for (const k of keys) {
-    if (!/^\d{1,3}$/.test(k)) return null;
-    const id = Number(k);
-    if (id < 1 || id > MAX_LEVEL) return null;
-    const v = times[k];
-    if (typeof v !== 'number' || !Number.isFinite(v)) return null;
-    if (v < MIN_ROOM_SECONDS || v > MAX_ROOM_SECONDS) return null;
-    out[id] = Math.round(v * 10) / 10;
-  }
-  return out;
-}
-
-const validKey = (k) => typeof k === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(k);
 
 // ---------- rate limiting ----------
 
@@ -175,7 +145,7 @@ function handleGetLeaderboard(res, query) {
   const list = sorted.slice(0, limit).map((e) => ({
     name: e.name,
     levels: levelsOf(e),
-    total: Math.round(totalOf(e) * 10) / 10,
+    total: totalOf(e),
     times: e.times,
     updated: e.updated,
   }));
@@ -184,7 +154,7 @@ function handleGetLeaderboard(res, query) {
   if (key) {
     const i = sorted.findIndex((e) => e.key === key);
     if (i >= 0) {
-      you = { rank: i + 1, levels: levelsOf(sorted[i]), total: Math.round(totalOf(sorted[i]) * 10) / 10 };
+      you = { rank: i + 1, levels: levelsOf(sorted[i]), total: totalOf(sorted[i]) };
     }
   }
   sendJson(res, 200, { ok: true, count: entries.size, entries: list, you });
@@ -200,7 +170,7 @@ async function handlePostScore(req, res) {
   if (!validKey(body.key)) return sendJson(res, 400, { ok: false, error: 'bad key' });
   const name = sanitizeName(body.name);
   if (!name) return sendJson(res, 400, { ok: false, error: 'bad name' });
-  const times = sanitizeTimes(body.times);
+  const times = sanitizeTimes(body.times, MAX_LEVEL);
   if (!times) return sendJson(res, 400, { ok: false, error: 'bad times' });
 
   const existing = entries.get(body.key);
@@ -209,10 +179,7 @@ async function handlePostScore(req, res) {
   }
 
   // Merge: per-room minimum against what we already have — runs only improve.
-  const merged = existing ? { ...existing.times } : {};
-  for (const [id, t] of Object.entries(times)) {
-    if (!(id in merged) || t < merged[id]) merged[id] = t;
-  }
+  const merged = mergeTimes(existing ? existing.times : {}, times);
   const entry = { key: body.key, name, times: merged, updated: Date.now() };
   entries.set(body.key, entry);
   saveSoon();
@@ -223,7 +190,7 @@ async function handlePostScore(req, res) {
     ok: true,
     rank,
     levels: levelsOf(entry),
-    total: Math.round(totalOf(entry) * 10) / 10,
+    total: totalOf(entry),
     count: entries.size,
   });
 }
