@@ -78,6 +78,7 @@ document.getElementById('btn-quit').addEventListener('click', async () => {
 let lastTick = performance.now();
 engine.onUpdate((dt, t) => {
   player.update(dt);
+  audio.updateListener(engine.camera);
   interaction.update();
   currentLevel?.update(dt, t);
   // Room timer: wall-clock seconds, so slow machines aren't under-billed by
