@@ -38,6 +38,33 @@ clues, work out what they mean, unlock the way onward. Early rooms ask you
 to notice; later rooms ask you to cross-reference, deduce, and remember the
 rooms that came before.
 
+## The dreamers — leaderboard
+
+The game times every room (active play only — pausing stops the clock) and
+keeps your best per room. The **dreamers** entry in the menu is the
+leaderboard: everyone ranked by **rooms completed**, ties broken by **total
+time across those rooms**, plus a *room by room* view of the single fastest
+crossing of each room. Choose a name there to join — until you do, nothing
+leaves your browser, and offline copies simply show your own times.
+
+Scores are held by a tiny zero-dependency server (`server/server.mjs`) that
+can also host the game itself:
+
+```bash
+npm run build && npm start   # game + leaderboard on http://localhost:8091
+```
+
+In dev (`npm run dev`), the vite proxy forwards `/api` to that server if
+it's running.
+
+## Hosting
+
+Pushing to `main` deploys the game to **GitHub Pages** automatically
+(`.github/workflows/deploy.yml` — enable Pages → "GitHub Actions" once if
+prompted). For a live leaderboard, run the server anywhere Node 18+ or
+Docker runs and point the Pages build at it with one repo variable. All
+three setups are described in [`docs/HOSTING.md`](docs/HOSTING.md).
+
 ## Technical notes
 
 - **Everything is procedural.** No binary assets: textures are generated on
@@ -63,6 +90,7 @@ Levels are verified headless (Chromium + software WebGL):
 npm run shot -- 3          # screenshot level 3 from four angles → shots/
 npm run playtest           # prove every level is solvable end-to-end
 npm run playtest -- 7      # just level 7
+npm run test:api           # leaderboard server contract tests
 ```
 
 Every level implements `debugSolve()`, which plays the level through its
@@ -73,4 +101,5 @@ be completed.
 
 ```bash
 npm run build              # static site in dist/, host anywhere
+npm start                  # serve dist/ + leaderboard API from one process
 ```
