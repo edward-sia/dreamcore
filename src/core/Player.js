@@ -55,7 +55,7 @@ export class Player {
   requestLock() {
     if (window.__TEST_MODE__) return;
     this.dom.requestPointerLock({ unadjustedMovement: true }).catch?.(() => {
-      try { this.dom.requestPointerLock(); } catch { /* headless */ }
+      try { this.dom.requestPointerLock()?.catch?.(() => {}); } catch { /* headless */ }
     });
   }
 

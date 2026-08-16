@@ -262,6 +262,7 @@ export class UI {
   _closeNote() { this._closeModal(); }
 
   _onKey(e) {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
     if (e.code === 'KeyJ') {
       if (this._modal === null || this._modal === 'journal') this.toggleJournal();
       return;

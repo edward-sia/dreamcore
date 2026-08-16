@@ -8,5 +8,10 @@ export default defineConfig({
   },
   server: {
     host: '127.0.0.1',
+    // Dev-time leaderboard: `npm start` runs the API on :8091. When it isn't
+    // running, the game just falls back to its offline (local-times) mode.
+    proxy: {
+      '/api': { target: 'http://127.0.0.1:8091', changeOrigin: true },
+    },
   },
 });

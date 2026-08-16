@@ -4,6 +4,7 @@ import { Interaction } from './core/Interaction.js';
 import { UI } from './core/UI.js';
 import { AudioEngine } from './core/AudioEngine.js';
 import { SaveSystem } from './core/SaveSystem.js';
+import { Leaderboard, formatTime } from './core/Leaderboard.js';
 import { LEVELS, levelClass, PROLOGUE, EPILOGUE } from './levels/index.js';
 
 // ---------- test / debug flags (must be set before subsystems construct) ----------
@@ -19,6 +20,7 @@ const audio = new AudioEngine();
 const player = new Player(engine.camera, engine.renderer.domElement);
 const interaction = new Interaction(engine.camera, ui);
 const save = new SaveSystem();
+const leaderboard = new Leaderboard(save);
 
 player.sensitivity = save.data.sensitivity;
 audio.volume = save.data.volume;
@@ -30,6 +32,8 @@ const game = { engine, player, ui, audio, interaction, save, onLevelComplete: nu
 let currentLevel = null;
 let playing = false;
 let transitioning = false;
+let paused = false;
+let levelElapsed = 0; // active seconds in the current room (pause excluded)
 
 // ---------- audio unlock on first gesture ----------
 const unlock = () => { audio.unlockFromGesture(); };
@@ -55,23 +59,34 @@ document.addEventListener('pointerlockchange', () => {
   if (!locked && playing && !transitioning && !ui.modalOpen) {
     pauseEl.classList.remove('hidden');
     player.frozen = true;
+    paused = true;
   }
 });
 document.getElementById('btn-resume').addEventListener('click', () => {
   pauseEl.classList.add('hidden');
   player.frozen = false;
+  paused = false;
   player.requestLock();
 });
 document.getElementById('btn-quit').addEventListener('click', async () => {
   pauseEl.classList.add('hidden');
+  paused = false;
   await exitToMenu();
 });
 
 // ---------- main loop ----------
+let lastTick = performance.now();
 engine.onUpdate((dt, t) => {
   player.update(dt);
   interaction.update();
   currentLevel?.update(dt, t);
+  // Room timer: wall-clock seconds, so slow machines aren't under-billed by
+  // the engine's dt clamp. Capped per frame so a suspended tab isn't billed,
+  // frozen while paused, immune to debug timeScale.
+  const now = performance.now();
+  const realDt = Math.min((now - lastTick) / 1000, 0.5);
+  lastTick = now;
+  if (playing && !paused) levelElapsed += realDt;
 });
 engine.start();
 
@@ -106,6 +121,8 @@ async function startLevel(id, { skipCard = false } = {}) {
   await ui.fadeIn(true);
 
   transitioning = false;
+  paused = false;
+  levelElapsed = 0;
   playing = true;
   player.enabled = true;
   interaction.enabled = true;
@@ -117,8 +134,13 @@ async function startLevel(id, { skipCard = false } = {}) {
 
 game.onLevelComplete = async () => {
   const meta = currentLevel.constructor.meta;
+  const timeTaken = levelElapsed;
   save.completeLevel(meta.id, LEVELS.length);
-  window.dispatchEvent(new CustomEvent('hiraeth:levelcomplete', { detail: { id: meta.id } }));
+  if (!window.__TEST_MODE__) {
+    save.recordTime(meta.id, timeTaken);
+    leaderboard.submit().catch(() => {});
+  }
+  window.dispatchEvent(new CustomEvent('hiraeth:levelcomplete', { detail: { id: meta.id, time: timeTaken } }));
 
   if (window.__TEST_MODE__) return; // playtests assert on the event; no transition
 
@@ -172,7 +194,9 @@ async function exitToMenu() {
 const menuEl = document.getElementById('menu');
 const levelsGrid = document.getElementById('menu-levels');
 const settingsBox = document.getElementById('menu-settings');
+const dreamersBox = document.getElementById('menu-dreamers');
 const buttonsBox = document.getElementById('menu-buttons');
+leaderboard.attach();
 
 function buildMenu() {
   const anyProgress = save.data.completed.length > 0 || save.data.unlocked > 1;
@@ -185,7 +209,9 @@ function buildMenu() {
     const unlocked = m.id <= save.data.unlocked;
     const done = save.data.completed.includes(m.id);
     cell.className = 'level-cell' + (unlocked ? '' : ' locked') + (done ? ' done' : '');
-    cell.innerHTML = `<div class="lc-num">${m.numeral}</div><div class="lc-name">${unlocked ? m.title : '· · ·'}</div>`;
+    const best = save.bestTime(m.id);
+    cell.innerHTML = `<div class="lc-num">${m.numeral}</div><div class="lc-name">${unlocked ? m.title : '· · ·'}</div>`
+      + (done && best !== null ? `<div class="lc-time">${formatTime(best)}</div>` : '');
     if (unlocked) cell.addEventListener('click', () => beginFromMenu(m.id));
     levelsGrid.appendChild(cell);
   }
@@ -219,10 +245,19 @@ document.getElementById('btn-new').addEventListener('click', () => {
 document.getElementById('btn-levels').addEventListener('click', () => {
   levelsGrid.classList.toggle('hidden');
   settingsBox.classList.add('hidden');
+  dreamersBox.classList.add('hidden');
 });
 document.getElementById('btn-settings').addEventListener('click', () => {
   settingsBox.classList.toggle('hidden');
   levelsGrid.classList.add('hidden');
+  dreamersBox.classList.add('hidden');
+});
+document.getElementById('btn-dreamers').addEventListener('click', () => {
+  const opening = dreamersBox.classList.contains('hidden');
+  dreamersBox.classList.toggle('hidden');
+  levelsGrid.classList.add('hidden');
+  settingsBox.classList.add('hidden');
+  if (opening) leaderboard.refresh();
 });
 document.getElementById('btn-back').addEventListener('click', () => {
   settingsBox.classList.add('hidden');
@@ -260,7 +295,8 @@ if (directLevel) {
 window.__game = {
   get level() { return currentLevel; },
   get playing() { return playing; },
-  player, ui, audio, interaction, engine, save,
+  get levelElapsed() { return levelElapsed; },
+  player, ui, audio, interaction, engine, save, leaderboard,
   loadLevel: (id) => startLevel(id, { skipCard: true }),
   solve: () => currentLevel?.debugSolve(),
   levels: LEVELS.map((L) => L.meta),
