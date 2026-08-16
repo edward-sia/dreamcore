@@ -900,7 +900,7 @@ static meta = {
 - **The last house** beyond the fence at (−12, 0, −22): a dark box 8 × 6 × 5 with **one lit window** (emissive plane `0xffd9a2` + a small light) — canon (VI). It back-lights the figure's start position.
 - **Swings** at (−9, 0, −3): a frame 4 m along x (two A-legs + top bar at y 2.4), five seats (boxes 0.45 × 0.05 × 0.2) on chains (thin cylinders). Seat 3 swings: rotate the chain+seat group about the top bar, `θ = 0.55·sin(t·1.55)`; `loopAt('swing', seatTop)`. Interact any seat → subtitle `'The chains are cold. This one moves by itself, and always did.'`.
 - **Roundabout** at (0, 0, −6): disc r 1.5, 0.35 high, six handrails; `whenUnseen(disc, …, { once: false, minTime: 1.2 })` → rotate `+0.6 rad` (snap; it turned while you weren't looking). Interact → subtitle `'It has turned since you looked. Only a little.'`.
-- **Slide** at (8, 0, −4): a ladder (blockers) up to a platform 2.2 m, a slope down toward −Z. Beside its foot: **the pipe** — a concrete tunnel big enough to walk into: `CylinderGeometry(1.0, 1.0, 2.6, 16, 1, true)`, `DoubleSide`, concrete mat, axis along X, centred at (10.5, 0.85, −6) so it sits 0.15 m into the ground and clears 1.85 m inside; open at both ends (x 9.2 and x 11.8); a low mound (a squashed sphere) over its middle. Do **not** `addCollider` the tube (its AABB would block the opening); instead add two blockers for its side walls: `[9.2, 0, −7.2]..[11.8, 2.2, −6.8]` and `[9.2, 0, −5.2]..[11.8, 2.2, −4.8]`. Its interior is hiding place **H_pipe**: `Box3 (9.4..11.6, 0..2, −6.7..−5.3)`. Occluders: the tube mesh and the mound.
+- **Slide** at (8, 0, −4): a ladder (blockers) up to a platform 2.2 m, a slope down toward −Z. Beside its foot: **the pipe** — a concrete tunnel big enough to walk into: `CylinderGeometry(1.0, 1.0, 2.6, 16, 1, true)`, `DoubleSide`, concrete mat, axis along X, centred at (10.5, 0.85, −6) so it sits 0.15 m into the ground and clears 1.85 m inside; open at both ends (x 9.2 and x 11.8), a concrete collar (a thin torus) at each end; no earth over it (a mound would show inside). Do **not** `addCollider` the tube (its AABB would block the opening); instead add two blockers for its side walls: `[9.2, 0, −7.2]..[11.8, 2.2, −6.8]` and `[9.2, 0, −5.2]..[11.8, 2.2, −4.8]`. Its interior is hiding place **H_pipe**: `Box3 (9.4..11.6, 0..2, −6.7..−5.3)`. Occluder: the tube mesh.
 - **Climbing frame** at (10, 0, +4): a 2 × 2 × 2 lattice of thin bars (a decoy hiding place inside it: `H_frame`).
 - **Shelter** at (−11, 0, +6): three walls (back wall along x at z +7.5, sides at x −12.5 and −9.5), roof at 2.4, open toward −Z; a bench inside; the **rhyme** painted on the back wall (`makeSign` 2.4 × 1.2, `bg '#5f6a6a'`, `color '#e2dccb'`, font `'italic 34px Georgia'`). Behind it, a hedge (a dark green box x −13..−8.5, z 8.7..9.5, height 1.8; blocker). Hiding place **H_shelter** = the gap **behind** the shelter, between its back wall and the hedge: `Box3 (−12.5..−9.5, 0..2, 7.6..8.6)`; entered round the shelter's east side. Occluders: the shelter walls, the hedge.
 - **Shed** at (13, 0, −10): a hut 2.4 × 2.4 × 2.6 (`wood '#4a3a2c'`), door shut (interact → `locked` + `'Locked. It always was. That was never the point of it.'`). Hiding place **H_shed** = behind it, toward the fence corner: `Box3 (12..14.5, 0..2, −12.6..−11.3)`. Occluder: the shed.
@@ -908,7 +908,7 @@ static meta = {
 - Spawn (−6, 0, +10.5), yaw 0.
 - Bounds: x ±16.5, z −20 (after the gate opens; before, the gate's collider holds) .. +11.5.
 
-**The figure.** `makeFigure()`; a `Presence` with `occluders = [pipe, mound, shed, shelter walls, slide platform]`, `minUnseen 0.6`. Stations:
+**The figure.** `makeFigure()`; a `Presence` with `occluders = [pipe, shed, shelter walls, hedge, slide platform]`, `minUnseen 0.6`. Stations:
 
 ```
 S0  (−1, 0, −11.5)     start — by the gate, in front of the lit window beyond the fence
@@ -1111,7 +1111,7 @@ END threshold z < −27 → complete()
 ```
 interact fuseNote → wait 0.3 → closeModal
 interact sw[kitchen] → wait 0.2; sw[hall] → 0.2; sw[sitting] → 0.2; sw[yours] → wait 0.8
-teleport(−2, −8, yaw 0)  → wait 6.5 (still) → wait 4.5 (approach)
+teleport(−2, −8, yaw 0)  → wait 6.5 (still) → wait 6.8 (the approach runs 6.5 s)
 teleport(−2, −17.5, yaw 0)             // facing the table
 interact box → wait 0.3
 teleport(−2, −17.5, yaw π) → wait 0.7  // face away → photo appears
@@ -1122,7 +1122,7 @@ interact lastDoor → wait 0.5
 teleport(−2, −23.1, yaw 0) → interact chair → wait 0.3 → closeModal → wait 1.2
 teleport(−2, −27.5) → wait 0.6
 ```
-(≈ 22 s.)
+(≈ 24 s.)
 
 **Fairness.** The note gives the order; each switch says what it wakes; a
 wrong prefix resets with V's own line; three wrongs spell it out. The
