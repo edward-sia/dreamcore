@@ -20,12 +20,20 @@ asset requests (the game itself) are free and unmetered; the free plan's
 100k requests/day only meter the score API. The schema creates itself on
 first use.
 
+For this repository the D1 database is **already created and wired into
+`wrangler.jsonc`** (schema initialized), so going live is:
+
 ```bash
 npm install && npm run build
-npx wrangler login                            # opens browser, free account is fine
+npx wrangler login       # opens browser, free account is fine
+npx wrangler deploy      # prints https://hiraeth.<you>.workers.dev
+```
+
+If you fork this repo you need your own database — create it and swap the
+id in `wrangler.jsonc`:
+
+```bash
 npx wrangler d1 create hiraeth-leaderboard    # prints a database_id
-#   → paste that id into wrangler.jsonc ("database_id": "…")
-npx wrangler deploy                           # prints https://hiraeth.<you>.workers.dev
 ```
 
 That printed URL is the shareable link — game and leaderboard together,

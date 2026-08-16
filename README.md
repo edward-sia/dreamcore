@@ -63,12 +63,13 @@ it's running.
 ## Hosting
 
 The easiest public link is **Cloudflare**: one free Worker serves the
-game and the leaderboard together, scores in D1 —
+game and the leaderboard together, scores in D1 (the database for this
+repo is already provisioned and wired into `wrangler.jsonc`) —
 
 ```bash
 npm run build
-npx wrangler d1 create hiraeth-leaderboard   # paste the id into wrangler.jsonc
-npx wrangler deploy                          # → https://hiraeth.<you>.workers.dev
+npx wrangler login
+npx wrangler deploy      # → https://hiraeth.<you>.workers.dev
 ```
 
 Alternatives: a ready-made **GitHub Pages** workflow ships in
