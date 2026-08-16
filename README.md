@@ -47,8 +47,11 @@ time across those rooms**, plus a *room by room* view of the single fastest
 crossing of each room. Choose a name there to join — until you do, nothing
 leaves your browser, and offline copies simply show your own times.
 
-Scores are held by a tiny zero-dependency server (`server/server.mjs`) that
-can also host the game itself:
+Scores are held by a tiny backend with two interchangeable
+implementations sharing one contract (`server/contract.mjs`): a
+zero-dependency Node server (`server/server.mjs`) and a Cloudflare
+Worker backed by D1 (`worker/index.mjs`). Both also host the game
+itself:
 
 ```bash
 npm run build && npm start   # game + leaderboard on http://localhost:8091
@@ -59,13 +62,20 @@ it's running.
 
 ## Hosting
 
-A ready-made **GitHub Pages** workflow ships in
-[`docs/workflows/deploy.yml`](docs/workflows/deploy.yml) — move it to
-`.github/workflows/` once (automation isn't allowed to install workflows)
-and every push to `main` deploys the game. For a live leaderboard, run the
-server anywhere Node 18+ or Docker runs and point the Pages build at it
-with one repo variable. All three setups are described in
-[`docs/HOSTING.md`](docs/HOSTING.md).
+The easiest public link is **Cloudflare**: one free Worker serves the
+game and the leaderboard together, scores in D1 —
+
+```bash
+npm run build
+npx wrangler d1 create hiraeth-leaderboard   # paste the id into wrangler.jsonc
+npx wrangler deploy                          # → https://hiraeth.<you>.workers.dev
+```
+
+Alternatives: a ready-made **GitHub Pages** workflow ships in
+[`docs/workflows/deploy.yml`](docs/workflows/deploy.yml) (move it to
+`.github/workflows/` once — automation isn't allowed to install
+workflows), and the Node server / Docker image self-hosts anywhere. All
+setups are described in [`docs/HOSTING.md`](docs/HOSTING.md).
 
 ## Technical notes
 

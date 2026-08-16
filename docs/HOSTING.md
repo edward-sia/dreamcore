@@ -1,14 +1,48 @@
 # Hosting HIRAETH & its leaderboard
 
-The game is a static site; the leaderboard is a tiny zero-dependency Node
-server (`server/server.mjs`) that can also serve the game itself. Pick the
-setup you want:
+The game is a static site. The leaderboard needs one small backend with
+one persistent store — there are two interchangeable implementations of
+the same API in this repo, so pick the setup you want:
 
-| setup | game | leaderboard |
-|---|---|---|
-| **A. GitHub Pages only** | free, automatic | offline (each player sees their own local times) |
-| **B. One small server** | served by the server | on the same server |
-| **C. Pages + server** | free on Pages | on your server, via one repo variable |
+| setup | game | leaderboard | scores live in |
+|---|---|---|---|
+| **⭐ Cloudflare** | one Worker, free | same Worker | D1 (Cloudflare's free SQLite) |
+| **A. GitHub Pages only** | free, automatic | offline (each player sees their own local times) | each player's browser |
+| **B. One small server** | served by the server | on the same server | a JSON file on disk |
+| **C. Pages + server** | free on Pages | on your server, via one repo variable | a JSON file on disk |
+
+## ⭐ Cloudflare — one link, everything included
+
+One Worker serves the game *and* the score API (`worker/index.mjs`),
+backed by **D1**, Cloudflare's free SQLite database — needed because
+Workers have no disk for the JSON file the Node server uses. Static
+asset requests (the game itself) are free and unmetered; the free plan's
+100k requests/day only meter the score API. The schema creates itself on
+first use.
+
+```bash
+npm install && npm run build
+npx wrangler login                            # opens browser, free account is fine
+npx wrangler d1 create hiraeth-leaderboard    # prints a database_id
+#   → paste that id into wrangler.jsonc ("database_id": "…")
+npx wrangler deploy                           # prints https://hiraeth.<you>.workers.dev
+```
+
+That printed URL is the shareable link — game and leaderboard together,
+playable by anyone. Preview locally first with `npx wrangler dev` (no
+account needed; uses a local D1). Redeploys keep all scores — they live
+in D1, not in the Worker. Useful extras:
+
+```bash
+npx wrangler d1 export hiraeth-leaderboard --remote --output backup.sql   # back up scores
+npx wrangler d1 execute hiraeth-leaderboard --remote \
+  --command "DELETE FROM entries WHERE name = 'somebody'"                 # moderate an entry
+```
+
+A custom domain can be attached later in the Cloudflare dashboard
+(Workers → your worker → Domains & Routes); no config change needed.
+The Worker's rate limiting is best-effort (per isolate) — for a popular
+deployment add a WAF rate-limiting rule on `/api/*` in the dashboard.
 
 ## A. GitHub Pages (game only)
 
@@ -107,5 +141,15 @@ honor-system leaderboard for a cozy puzzle game, not an anti-cheat fortress.
 If an entry needs removing, delete its line from `leaderboard.json` and
 restart.
 
-Testing: `npm run test:api` boots a scratch server and checks the whole
-contract (ranking, merging, validation, CORS, rate limits).
+The validation, merging and ranking rules live in `server/contract.mjs`,
+shared by both implementations, so the Node server and the Worker behave
+identically.
+
+Testing: `npm run test:api` boots a scratch Node server and checks the
+whole contract (ranking, merging, validation, CORS, rate limits). The
+same suite runs against the Worker:
+
+```bash
+npx wrangler dev &   # fresh local D1
+LB_TEST_URL=http://127.0.0.1:8787 node tools/leaderboard-test.mjs
+```

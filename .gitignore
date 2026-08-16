@@ -2,5 +2,6 @@ node_modules/
 dist/
 shots/
 server/data/
+.wrangler/
 *.log
 .DS_Store
