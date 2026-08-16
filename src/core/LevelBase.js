@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 
+const _p = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _f = new THREE.Vector3();
+const _ray = new THREE.Raycaster();
+
 /**
  * Base class for all levels. Subclasses implement build() and may override
  * onUpdate(dt, t) and debugSolve().
@@ -21,6 +24,10 @@ export class LevelBase {
     outro: '',              // interlude text after completion
   };
 
+  /** Note frequencies (C major, octave 4) and a helper: tune('EGAGEGE') → [329.63, …]. */
+  static NOTES = { C: 261.63, D: 293.66, E: 329.63, F: 349.23, G: 392.0, A: 440.0, B: 493.88 };
+  static tune(letters) { return [...letters].map((l) => LevelBase.NOTES[l]); }
+
   constructor(game) {
     this.game = game;                 // { engine, player, ui, audio, interaction, save }
     this.scene = new THREE.Scene();
@@ -36,6 +43,7 @@ export class LevelBase {
     this._items = [];
     this._completed = false;
     this._timeouts = new Set();
+    this._loops = new Set();
   }
 
   // ---------- lifecycle (called by main) ----------
@@ -60,6 +68,11 @@ export class LevelBase {
   dispose() {
     for (const id of this._timeouts) clearTimeout(id);
     this._timeouts.clear();
+    for (const h of this._loops) { try { h.stop?.(0.3); } catch {} }
+    this._loops.clear();
+    this._tickers.clear();
+    this._tracked.clear();
+    this.game.audio.setDread?.(0);
     this.game.interaction.clear();
     this.scene.traverse((o) => {
       o.geometry?.dispose?.();
@@ -90,11 +103,16 @@ export class LevelBase {
     return object;
   }
 
-  /** Register an invisible blocker without geometry. */
+  /** Register an invisible blocker without geometry. Returns the Box3 (see removeBlocker). */
   addBlocker(min, max) {
-    this.solids.push(new THREE.Box3(
-      new THREE.Vector3(...min), new THREE.Vector3(...max)
-    ));
+    const box = new THREE.Box3(new THREE.Vector3(...min), new THREE.Vector3(...max));
+    this.solids.push(box);
+    return box;
+  }
+
+  removeBlocker(box) {
+    const i = this.solids.indexOf(box);
+    if (i >= 0) this.solids.splice(i, 1);
   }
 
   /** Remove the collider that was created for an object (e.g. an opened door). */
@@ -171,6 +189,106 @@ export class LevelBase {
   }
 
   playSound(name, opts) { this.game.audio.sfx(name, opts); }
+
+  // ---------- positional sound, dread, blink ----------
+
+  playSoundAt(name, position, opts) { this.game.audio.sfxAt?.(name, position, opts); }
+
+  /** A sustained positional sound; stopped automatically when the level is disposed. */
+  loopAt(kind, position, opts) {
+    const h = this.game.audio.loopAt(kind, position, opts);
+    this._loops.add(h);
+    return h;
+  }
+
+  dread(v) { this.game.audio.setDread?.(v); }
+
+  hush(seconds, depth) { this.game.audio.hush?.(seconds, depth); }
+
+  /** A one-blink post-process spike; `flash` > 0 also blacks the screen for that many ms. */
+  flinch({ grain = 0.3, fringe = 0.008, desat = 0.6, duration = 0.35, flash = 0 } = {}) {
+    this.game.engine.pulseGrade?.({ grain, fringe, desat, duration });
+    if (flash > 0) this.game.ui.flash?.('#000', flash);
+  }
+
+  // ---------- seen / unseen ----------
+
+  /** Is `obj` inside the player's view cone (and not behind an occluder)? */
+  isSeen(obj, { angleDeg = 55, maxDist = Infinity, occluders = null } = {}) {
+    const cam = this.game.engine.camera;
+    obj.getWorldPosition(_p);
+    cam.getWorldPosition(_c);
+    _d.subVectors(_p, _c);
+    const dist = _d.length();
+    if (dist > maxDist) return false;
+    if (dist < 1e-6) return true;
+    _d.divideScalar(dist);
+    cam.getWorldDirection(_f);
+    if (_f.dot(_d) < Math.cos(angleDeg * Math.PI / 180)) return false;
+    if (occluders && occluders.length) {
+      _ray.set(_c, _d);
+      _ray.far = Math.max(0, dist - 0.05);
+      if (_ray.intersectObjects(occluders, true).length) return false;
+    }
+    return true;
+  }
+
+  /** Call fn(obj) once obj has been out of view for minTime seconds. Returns an unregister function. */
+  whenUnseen(obj, fn, { minTime = 0.4, angleDeg = 55, maxDist = Infinity, occluders = null, once = true } = {}) {
+    let acc = 0, wait = false;
+    const off = this.tick((dt) => {
+      if (this.isSeen(obj, { angleDeg, maxDist, occluders })) { acc = 0; wait = false; return; }
+      if (wait) return;
+      acc += dt;
+      if (acc >= minTime) {
+        if (once) off(); else { acc = 0; wait = true; }
+        fn(obj);
+      }
+    });
+    return off;
+  }
+
+  /** Call fn(obj) once obj has been in view for minTime seconds. Returns an unregister function. */
+  whenSeen(obj, fn, { minTime = 0.15, angleDeg = 40, maxDist = 30, occluders = null, once = true } = {}) {
+    let acc = 0, wait = false;
+    const off = this.tick((dt) => {
+      if (!this.isSeen(obj, { angleDeg, maxDist, occluders })) { acc = 0; wait = false; return; }
+      if (wait) return;
+      acc += dt;
+      if (acc >= minTime) {
+        if (once) off(); else { acc = 0; wait = true; }
+        fn(obj);
+      }
+    });
+    return off;
+  }
+
+  // ---------- captions ----------
+
+  /** A bracketed subtitle for a sound: "[knocking]" — with a direction word if captions are on. */
+  cue(text, worldPos = null) {
+    let s = `[${text}]`;
+    if (worldPos && this.game.save?.data?.captions) s += ` — ${this.directionWord(worldPos)}`;
+    this.game.ui.subtitle(s, 3.2, { voice: 'cue' });
+  }
+
+  /** ahead / behind you / to your left / to your right / above you, relative to the camera. */
+  directionWord(worldPos) {
+    const cam = this.game.engine.camera;
+    cam.getWorldPosition(_c);
+    const dx = worldPos.x - _c.x, dy = worldPos.y - _c.y, dz = worldPos.z - _c.z;
+    if (dy > 1.5 && Math.hypot(dx, dz) < 5) return 'above you';
+    cam.getWorldDirection(_f);
+    const fwd = Math.atan2(-_f.x, -_f.z);          // player yaw convention: forward = (-sin yaw, 0, -cos yaw)
+    const to = Math.atan2(-dx, -dz);
+    let a = to - fwd;
+    while (a > Math.PI) a -= 2 * Math.PI;
+    while (a < -Math.PI) a += 2 * Math.PI;
+    const deg = Math.abs(a) * 180 / Math.PI;
+    if (deg < 35) return 'ahead';
+    if (deg > 145) return 'behind you';
+    return a > 0 ? 'to your left' : 'to your right';
+  }
 
   /** Mark the level solved. Fades out and advances — call exactly once. */
   complete() {
