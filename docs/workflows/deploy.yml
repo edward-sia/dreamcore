@@ -1,0 +1,61 @@
+# Builds the game and publishes it to GitHub Pages on every push to main.
+#
+# One-time setup if the first run complains: repo Settings → Pages →
+# Source: "GitHub Actions".
+#
+# Optional leaderboard: deploy server/server.mjs somewhere (see
+# docs/HOSTING.md), then add a repository variable LEADERBOARD_URL
+# (Settings → Secrets and variables → Actions → Variables) pointing at it,
+# e.g. https://hiraeth.example.com — the Pages build will submit and read
+# scores from there. Without it the game runs with a local-only times view.
+
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Point the build at the leaderboard server
+        if: vars.LEADERBOARD_URL != ''
+        env:
+          LEADERBOARD_URL: ${{ vars.LEADERBOARD_URL }}
+        run: |
+          printf '{ "api": "%s" }\n' "$LEADERBOARD_URL" > dist/leaderboard.json
+          echo "leaderboard -> $LEADERBOARD_URL"
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

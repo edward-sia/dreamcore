@@ -12,13 +12,24 @@ setup you want:
 
 ## A. GitHub Pages (game only)
 
-Already wired: `.github/workflows/deploy.yml` builds and publishes on every
-push to `main`. If the first run complains about Pages, enable it once in
-**Settings → Pages → Source: GitHub Actions**, then re-run the workflow.
+The deploy workflow ships at [`docs/workflows/deploy.yml`](workflows/deploy.yml)
+— GitHub doesn't allow automation to install workflows, so move it into
+place once yourself:
 
-The game will be at `https://<user>.github.io/<repo>/`. Without a leaderboard
-server the *dreamers* menu still works — it shows each player their own best
-times, stored in their browser.
+```bash
+mkdir -p .github/workflows
+git mv docs/workflows/deploy.yml .github/workflows/deploy.yml
+git commit -m "Enable Pages deploy" && git push
+```
+
+(Equivalently: create `.github/workflows/deploy.yml` in the GitHub web UI
+and paste the file's contents.) If the first run complains about Pages,
+enable it once in **Settings → Pages → Source: GitHub Actions** and re-run
+the workflow. From then on every push to `main` publishes
+`https://<user>.github.io/<repo>/`.
+
+Without a leaderboard server the *dreamers* menu still works — it shows
+each player their own best times, stored in their browser.
 
 ## B. One server for everything
 

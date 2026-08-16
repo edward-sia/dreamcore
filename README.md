@@ -59,11 +59,13 @@ it's running.
 
 ## Hosting
 
-Pushing to `main` deploys the game to **GitHub Pages** automatically
-(`.github/workflows/deploy.yml` — enable Pages → "GitHub Actions" once if
-prompted). For a live leaderboard, run the server anywhere Node 18+ or
-Docker runs and point the Pages build at it with one repo variable. All
-three setups are described in [`docs/HOSTING.md`](docs/HOSTING.md).
+A ready-made **GitHub Pages** workflow ships in
+[`docs/workflows/deploy.yml`](docs/workflows/deploy.yml) — move it to
+`.github/workflows/` once (automation isn't allowed to install workflows)
+and every push to `main` deploys the game. For a live leaderboard, run the
+server anywhere Node 18+ or Docker runs and point the Pages build at it
+with one repo variable. All three setups are described in
+[`docs/HOSTING.md`](docs/HOSTING.md).
 
 ## Technical notes
 
