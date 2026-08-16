@@ -69,9 +69,23 @@
         <button id="btn-continue" class="menu-btn">continue</button>
         <button id="btn-new" class="menu-btn">begin again</button>
         <button id="btn-levels" class="menu-btn">rooms</button>
+        <button id="btn-dreamers" class="menu-btn">dreamers</button>
         <button id="btn-settings" class="menu-btn">settings</button>
       </div>
       <div id="menu-levels" class="hidden"></div>
+      <div id="menu-dreamers" class="hidden">
+        <div id="lb-sub">the leaderboard — ranked by rooms crossed, then by how quickly</div>
+        <div id="lb-tabs">
+          <button class="lb-tab on" data-view="dream">the dream</button>
+          <button class="lb-tab" data-view="rooms">room by room</button>
+        </div>
+        <div id="lb-body"></div>
+        <div id="lb-join" class="hidden">
+          <input id="lb-name" maxlength="24" spellcheck="false" autocomplete="off" placeholder="what do the others call you?" />
+          <button id="lb-join-btn" class="menu-btn small">join</button>
+        </div>
+        <div id="lb-foot"></div>
+      </div>
       <div id="menu-settings" class="hidden">
         <label>look sensitivity <input id="set-sens" type="range" min="0.2" max="2.5" step="0.1" /></label>
         <label>volume <input id="set-vol" type="range" min="0" max="1" step="0.05" /></label>

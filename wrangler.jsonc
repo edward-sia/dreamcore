@@ -1,0 +1,32 @@
+// Cloudflare deployment: one Worker serves the built game and the
+// leaderboard API (worker/index.mjs) backed by D1.
+//
+//   npm run build
+//   npx wrangler deploy          → https://hiraeth.<you>.workers.dev
+//
+// The database_id below is the already-provisioned hiraeth-leaderboard D1
+// database (schema initialized). If you fork this repo, create your own:
+//   npx wrangler d1 create hiraeth-leaderboard   ← paste the printed id below
+//
+// Local preview (no Cloudflare account needed): npx wrangler dev
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hiraeth",
+  "main": "worker/index.mjs",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "./dist"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hiraeth-leaderboard",
+      "database_id": "20477ca4-7357-4679-bf78-3548f7681334"
+    }
+  ],
+  "vars": {
+    "MAX_LEVEL": "10",
+    "MAX_ENTRIES": "5000",
+    "ALLOWED_ORIGIN": "*"
+  }
+}

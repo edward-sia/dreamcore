@@ -284,7 +284,67 @@ html, body {
 .level-cell.locked { opacity: 0.22; cursor: default; }
 .level-cell .lc-num { font-size: 20px; letter-spacing: 0.1em; }
 .level-cell .lc-name { font-size: 10.5px; font-style: italic; margin-top: 6px; letter-spacing: 0.04em; line-height: 1.35; }
+.level-cell .lc-time { font-size: 10px; margin-top: 5px; letter-spacing: 0.08em; opacity: 0.55; }
 .level-cell.done .lc-num::after { content: ' ·'; opacity: 0.8; }
+
+/* ---------- Leaderboard (dreamers) ---------- */
+#menu-dreamers {
+  margin-top: 30px;
+  width: min(560px, 90vw);
+  margin-left: auto; margin-right: auto;
+  color: var(--ghost-dim);
+}
+#lb-sub {
+  font-style: italic; font-size: 13px; letter-spacing: 0.1em;
+  opacity: 0.65; margin-bottom: 18px;
+}
+#lb-tabs { display: flex; gap: 10px; justify-content: center; margin-bottom: 16px; }
+.lb-tab {
+  font-family: var(--serif); font-style: italic; font-size: 13px;
+  letter-spacing: 0.12em; color: var(--ghost-dim);
+  background: none; border: 1px solid rgba(238,233,222,0.14);
+  padding: 5px 16px; cursor: pointer;
+  transition: all 0.25s ease;
+}
+.lb-tab:hover { color: #fff; border-color: rgba(238,233,222,0.4); }
+.lb-tab.on { color: var(--ghost); border-color: rgba(238,233,222,0.45); background: rgba(238,233,222,0.05); }
+#lb-body { max-height: 34vh; overflow-y: auto; scrollbar-width: thin; }
+.lb-table { display: flex; flex-direction: column; gap: 2px; }
+.lb-row {
+  display: grid; grid-template-columns: 2.6em 1fr 4.5em 5.5em;
+  gap: 8px; align-items: baseline;
+  padding: 5px 10px;
+  font-size: 14px; letter-spacing: 0.05em;
+  text-align: left;
+}
+.lb-table.rooms .lb-row { grid-template-columns: 3em 1fr 8em 6.5em; }
+.lb-row div:first-child { opacity: 0.55; }
+.lb-row div:nth-child(2) { font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-row div:last-child, .lb-row div:nth-child(3) { text-align: right; font-variant-numeric: tabular-nums; }
+.lb-row.lb-head { font-size: 11px; letter-spacing: 0.16em; opacity: 0.45; font-style: normal; }
+.lb-row.lb-head div { font-style: normal; }
+.lb-row.lb-you {
+  color: var(--ghost);
+  background: rgba(238,233,222,0.06);
+  border-left: 2px solid rgba(238,233,222,0.4);
+}
+.lb-mine { opacity: 0.55; font-size: 12px; }
+.lb-empty { font-style: italic; font-size: 14px; opacity: 0.5; padding: 18px 0; }
+#lb-join { margin-top: 18px; display: flex; gap: 10px; justify-content: center; align-items: center; }
+#lb-name {
+  font-family: var(--serif); font-style: italic; font-size: 14px;
+  letter-spacing: 0.06em; color: var(--ghost);
+  background: rgba(238,233,222,0.05);
+  border: 1px solid rgba(238,233,222,0.2);
+  padding: 8px 14px; width: min(300px, 60vw);
+  outline: none; user-select: text;
+}
+#lb-name:focus { border-color: rgba(238,233,222,0.5); }
+#lb-name::placeholder { color: rgba(238,233,222,0.3); }
+#lb-foot {
+  margin-top: 14px; font-style: italic; font-size: 12.5px;
+  letter-spacing: 0.08em; opacity: 0.55; min-height: 1.2em;
+}
 
 #menu-settings { margin-top: 34px; display: flex; flex-direction: column; gap: 20px; align-items: center; }
 #menu-settings label {
