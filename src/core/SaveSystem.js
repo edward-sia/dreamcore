@@ -10,6 +10,8 @@ const DEFAULTS = {
   volume: 0.8,
   bloom: true,
   sawPrologue: false,
+  captions: false,
+  seenPrologues: [],
 };
 
 export class SaveSystem {
@@ -46,6 +48,15 @@ export class SaveSystem {
     return Number.isFinite(t) ? t : null;
   }
 
+  /** Bring an older save up to date with a longer level list. */
+  migrate(totalLevels) {
+    const maxDone = this.data.completed.length ? Math.max(...this.data.completed) : 0;
+    const want = Math.max(this.data.unlocked, maxDone + 1);
+    this.data.unlocked = Math.max(1, Math.min(want, totalLevels));
+    if (!Array.isArray(this.data.seenPrologues)) this.data.seenPrologues = [];
+    this.save();
+  }
+
   reset() {
     // "begin again" restarts the dream but keeps settings, best times
     // (they are records, like speedrun PBs) and the leaderboard identity.
@@ -56,6 +67,7 @@ export class SaveSystem {
       sensitivity: this.data.sensitivity,
       volume: this.data.volume,
       bloom: this.data.bloom,
+      captions: this.data.captions,
     };
     this.data = { ...DEFAULTS, ...keep };
     this.save();

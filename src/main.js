@@ -20,6 +20,7 @@ const audio = new AudioEngine();
 const player = new Player(engine.camera, engine.renderer.domElement);
 const interaction = new Interaction(engine.camera, ui);
 const save = new SaveSystem();
+save.migrate(LEVELS.length);
 const leaderboard = new Leaderboard(save);
 
 player.sensitivity = save.data.sensitivity;
@@ -106,12 +107,18 @@ async function startLevel(id, { skipCard = false } = {}) {
   ui.clearClues();
   ui.setItems([]);
 
+  const meta = LevelClass.meta;
+  engine.setGrade(meta.grade ?? null);
+  if (meta.prologue && !skipCard && !window.__TEST_MODE__ && !save.data.seenPrologues.includes(id)) {
+    save.data.seenPrologues.push(id);
+    save.save();
+    await ui.showInterlude(meta.prologue);
+  }
+
   currentLevel = new LevelClass(game);
   currentLevel.init();
   engine.setScene(currentLevel.scene);
   player.spawnAt(currentLevel.spawn.position, currentLevel.spawn.yaw);
-
-  const meta = LevelClass.meta;
   audio.setAmbience(meta.mood);
   ui.showHUD(true);
   ui.setObjective('');
@@ -162,7 +169,7 @@ game.onLevelComplete = async () => {
     await startLevel(nextId);
   } else {
     await ui.showInterlude(EPILOGUE);
-    await ui.showInterlude('H I R A E T H\n\na dream in ten rooms\n\nthank you for staying asleep with me');
+    await ui.showInterlude('H I R A E T H\n\na dream in fifteen rooms\n\nthank you for staying asleep with me');
     await exitToMenu();
   }
 };
@@ -202,6 +209,10 @@ leaderboard.attach();
 function buildMenu() {
   const anyProgress = save.data.completed.length > 0 || save.data.unlocked > 1;
   document.getElementById('btn-continue').disabled = !anyProgress;
+  document.getElementById('menu-sub').textContent = save.data.completed.includes(10)
+    ? 'a dream in ten rooms · and the five beneath'
+    : 'a dream in ten rooms';
+  document.getElementById('set-captions').checked = save.data.captions;
 
   levelsGrid.innerHTML = '';
   for (const L of LEVELS) {
@@ -276,6 +287,10 @@ document.getElementById('set-vol').addEventListener('input', (e) => {
 document.getElementById('set-quality').addEventListener('change', (e) => {
   save.data.bloom = e.target.checked;
   engine.setBloomEnabled(save.data.bloom);
+  save.save();
+});
+document.getElementById('set-captions').addEventListener('change', (e) => {
+  save.data.captions = e.target.checked;
   save.save();
 });
 
