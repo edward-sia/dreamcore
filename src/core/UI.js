@@ -10,7 +10,7 @@ export class UI {
       journal: $('journal'), journalEntries: $('journal-entries'),
       keypad: $('keypad'), keypadLabel: $('keypad-label'),
       keypadDisplay: $('keypad-display'), keypadGrid: $('keypad-grid'),
-      fade: $('fade'), titlecard: $('titlecard'),
+      fade: $('fade'), flash: $('flash'), titlecard: $('titlecard'),
       titlecardNum: $('titlecard-num'), titlecardName: $('titlecard-name'),
       interlude: $('interlude'), interludeText: $('interlude-text'),
       interludeContinue: $('interlude-continue'),
@@ -21,6 +21,7 @@ export class UI {
     this._noteClose = null;
     this._keypadState = null;
     this._subTimer = null;
+    this._flashTimer = null;
     this._clues = [];
 
     document.addEventListener('keydown', (e) => this._onKey(e));
@@ -60,16 +61,31 @@ export class UI {
     }, 600);
   }
 
-  subtitle(text, duration = 4.5) {
+  subtitle(text, duration = 4.5, { voice = 'inner' } = {}) {
     clearTimeout(this._subTimer);
     const el = this.el.subtitle;
     el.textContent = text;
+    el.classList.toggle('cue', voice === 'cue');
     el.classList.remove('hidden');
     el.style.opacity = '1';
     this._subTimer = setTimeout(() => {
       el.style.opacity = '0';
       setTimeout(() => el.classList.add('hidden'), 900);
     }, duration * 1000);
+  }
+
+  /** A blink: the screen goes to `color` at once and clears over 0.25 s after `ms`. */
+  flash(color = '#000', ms = 110) {
+    const el = this.el.flash;
+    if (!el) return;
+    clearTimeout(this._flashTimer);
+    el.style.transition = 'none';
+    el.style.background = color;
+    el.style.opacity = '1';
+    this._flashTimer = setTimeout(() => {
+      el.style.transition = 'opacity 0.25s ease';
+      el.style.opacity = '0';
+    }, ms);
   }
 
   // ---------- notes & journal ----------
@@ -111,8 +127,8 @@ export class UI {
 
   // ---------- keypad ----------
 
-  showKeypad({ label, length = 4, keys = '1234567890', onSubmit, onCancel }) {
-    this._keypadState = { code: '', length, onSubmit, onCancel };
+  showKeypad({ label, length = 4, keys = '1234567890', onSubmit, onCancel, onKey }) {
+    this._keypadState = { code: '', length, keys, onSubmit, onCancel, onKey };
     this.el.keypadLabel.textContent = label || '';
     this.el.keypadDisplay.textContent = '';
     const grid = this.el.keypadGrid;
@@ -136,7 +152,7 @@ export class UI {
     const st = this._keypadState;
     if (!st) return;
     if (k === null) st.code = st.code.slice(0, -1);
-    else if (st.code.length < st.length) st.code += k;
+    else if (st.code.length < st.length) { st.code += k; st.onKey?.(k); }
     this.el.keypadDisplay.textContent = st.code.padEnd(st.length, '·');
     if (st.code.length === st.length) {
       const code = st.code;
@@ -268,7 +284,7 @@ export class UI {
       return;
     }
     if (!this._modal) return;
-    if (e.code === 'KeyE' || e.code === 'Enter' || e.code === 'Space') {
+    if ((e.code === 'KeyE' && this._modal !== 'keypad') || e.code === 'Enter' || e.code === 'Space') {
       if (this._modal === 'note') this._closeNote();
     } else if (e.code === 'Escape') {
       this._closeModal();
@@ -276,6 +292,9 @@ export class UI {
       this._keypadPress(e.code.slice(-1));
     } else if (this._modal === 'keypad' && e.code === 'Backspace') {
       this._keypadPress(null);
+    } else if (this._modal === 'keypad' && /^Key[A-Z]$/.test(e.code)) {
+      const ch = e.code.slice(-1);
+      if (this._keypadState?.keys?.includes(ch)) this._keypadPress(ch);
     }
   }
 }
