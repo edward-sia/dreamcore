@@ -152,6 +152,7 @@ export class UI {
     const st = this._keypadState;
     if (!st) return;
     if (k === null) st.code = st.code.slice(0, -1);
+    else if (!st.keys.includes(k)) return;   // a key this pad does not have
     else if (st.code.length < st.length) { st.code += k; st.onKey?.(k); }
     this.el.keypadDisplay.textContent = st.code.padEnd(st.length, '·');
     if (st.code.length === st.length) {
@@ -293,8 +294,7 @@ export class UI {
     } else if (this._modal === 'keypad' && e.code === 'Backspace') {
       this._keypadPress(null);
     } else if (this._modal === 'keypad' && /^Key[A-Z]$/.test(e.code)) {
-      const ch = e.code.slice(-1);
-      if (this._keypadState?.keys?.includes(ch)) this._keypadPress(ch);
+      this._keypadPress(e.code.slice(-1));   // _keypadPress applies the keys whitelist
     }
   }
 }

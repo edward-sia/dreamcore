@@ -176,8 +176,15 @@ export class AudioEngine {
     if (!amb) return;
     this._amb = null;
     amb.timers.forEach(clearTimeout);
-    const ctx = this.ctx;
-    amb.gain.gain.setTargetAtTime(0, ctx.currentTime, 1.2);
+    const now = this.ctx.currentTime;
+    // A hush() in flight has already scheduled the ramp back up to 0.5, and
+    // these nodes stay connected for another 4 s — so drop anything still
+    // queued before starting the fade, or the outgoing drone swells again in
+    // the middle of it. Cancelling first leaves our own fade untouched.
+    const g = amb.gain.gain;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    g.setTargetAtTime(0, now, 1.2);
     setTimeout(() => {
       amb.nodes.forEach((n) => { try { n.stop?.(); } catch {} try { n.disconnect(); } catch {} });
       try { amb.gain.disconnect(); } catch {}
