@@ -16,6 +16,7 @@ roughly one minute per room. The dream starts indoors and close
 (hallway, pool), breathes outward (street, field), passes through
 in-between places (supermarket, platform, theater), turns inward to
 memory itself (house, archive), and ends at the edge of waking (shore).
+Five more follow after a false wake — see Phases 5–7 (XI–XV), below.
 
 | # | numeral | title | mood | phase |
 |---|---|---|---|---|
@@ -280,7 +281,7 @@ mechanics.
 3. **wake** — through the door, the beach continues but brighter; the
    fog lifts as you walk the last stretch to the waterline while
    subtitles let go, one line at a time. Reaching the water completes
-   the level — and the game (the epilogue in `levels/index.js` plays).
+   the level. It no longer ends the game — see **Rooms XI–XV**, below.
 
 ## Rooms XI–XV — the five beneath
 
@@ -302,5 +303,5 @@ room, ports 51NN/52NN, full-suite gate 15/15).
 - Ports are per-room (51NN / 52NN) so rooms can be verified in
   parallel.
 - Phase gate: after each phase, the full suite (`npm run playtest`)
-  must pass 10/10 (or all-shipped/all-shipped) before the next phase
+  must pass 15/15 (or all-shipped/all-shipped) before the next phase
   begins.

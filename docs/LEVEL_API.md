@@ -4,7 +4,7 @@ Read `src/levels/Level01.js` first; it is the canonical example of everything be
 
 ## The game
 
-First-person dreamcore puzzle game. Ten levels ("rooms"), each a distorted
+First-person dreamcore puzzle game. Fifteen levels ("rooms"), each a distorted
 memory: liminal, softly eerie, quietly sad — never horror, never jump-scares.
 Nothing chases the player. The dread is ambient; the sadness is textual.
 Visual style: realistic-leaning (PBR materials, fog, warm/cold light pools),
@@ -17,7 +17,7 @@ Create exactly one file `src/levels/LevelNN.js` (two digits). It must
 
 ```js
 static meta = {
-  id: N,                    // level number, 1..10
+  id: N,                    // level number, 1..15
   numeral: 'IV',            // roman numeral
   title: 'The Something',   // shown on the title card
   mood: 'pool',             // ambience key, see Audio below
