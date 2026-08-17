@@ -13,17 +13,26 @@ import { makeFigure, Presence } from '../core/presence.js';
 
 const V = (x, y, z) => ({ x, y, z });
 
-// Where the figure stands. Nothing here is ever nearer than about two metres
-// to a place the player can be while the figure is allowed to move — Presence
-// does no distance checking of its own, so this table plus _presenceStep()'s
-// SAFE guard is the whole of the two-metre promise (spec §1.2 clause 2).
+// Where the figure stands. Presence does no distance checking of its own, so
+// this table plus _presenceStep()'s SAFE guard is the whole of the two-metre
+// promise (spec §1.2 clause 2).
+//
+// The nine approach stations carry the load, because while the figure walks
+// up to one of them the player is pinned inside a hiding volume and cannot
+// simply step away. So each of them is at least 2.75 m from the nearest point
+// of the volume it belongs to — S1 5.69, S2 2.80, S3 2.75 for the pipe; S4
+// 6.19, S5 3.31, S6 2.75 for the shed; S7 7.96, S8 3.20, S9 2.75 for the
+// shelter. That leaves 0.5 m of slack over SAFE everywhere, so the guard only
+// has to hold the figure still if the player leaves the volume and walks at
+// it. The rest stations need no such floor: the player is out in the open by
+// then and one step in any direction frees the figure.
 const STATIONS = [
   V(-1, 0, -11.5),                                   // 0   S0  start, by the gate
-  V(4, 0, -8.5), V(8.5, 0, -9.2), V(13.9, 0, -6),    // 1-3 S1..S3, S3 outside the pipe's east mouth
+  V(4, 0, -8.5), V(8.5, 0, -9.35), V(14.35, 0, -6),  // 1-3 S1..S3, S3 out beyond the pipe's east mouth
   V(5, 0, -2),                                       // 4   R1  rest, in the open
-  V(9, 0, -6), V(12, 0, -8), V(10.1, 0, -12.1),      // 5-7 S4..S6, S6 west of the shed
+  V(9, 0, -6), V(12, 0, -8), V(9.45, 0, -12.1),      // 5-7 S4..S6, S6 west of the shed
   V(7, 0, 1),                                        // 8   R2  rest, mid-playground
-  V(-3, 0, 3), V(-6.5, 0, 6.5), V(-7.4, 0, 8.15),    // 9-11 S7..S9, S9 at the east end of the gap
+  V(-3, 0, 3), V(-6.5, 0, 6.5), V(-6.75, 0, 8.15),   // 9-11 S7..S9, S9 past the east end of the gap
   V(-7.6, 0, 4.6),                                   // 12  R3  rest, in the open
 ];
 
@@ -46,7 +55,22 @@ const GATE = V(0, 0, -13);
 const PADLOCK = V(0.5, 1.05, -12.95);
 const LAMP = V(2, 4.2, 2);
 const SWING = V(-9, 2.4, -3);
-const SAFE = 2.1;              // metres the figure keeps between itself and the player
+// Metres the figure keeps between itself and the player, measured on the
+// ground plane. The spec says "about two metres" (§1.2 clauses 2 and 4); this
+// is a quarter of a metre over that, so the promise is not being measured
+// against the same number it is made of, and the station table above leaves
+// another half metre on top of it.
+const SAFE = 2.25;
+
+// The figure is never *drawn* this near the player. `SAFE` bounds what the
+// figure does to the gap; nothing bounds what the player does to it, because
+// the figure has no collider — §1.2 clause 2 says it never blocks a path, so
+// giving it one is not available. So the room answers the other way: come this
+// close and it is not there. Two radii, so a player pacing the line does not
+// make it flicker. Both sit above SAFE, so the veil always answers before the
+// walk guard has to.
+const VEIL_GONE = 2.6;
+const VEIL_BACK = 3.1;
 
 const RHYME = [
   'one, two — you’re in the pipe where the slide comes down.',
@@ -637,8 +661,8 @@ export default class Level14 extends LevelBase {
     });
     this._presence.placeAt(0);        // before a frame renders, or it shows at the origin
     // deliberately NOT this.track(...): _presenceStep() drives it, so the level
-    // can hold it still whenever the player is inside SAFE metres of it or of
-    // the station it is about to appear at.
+    // can refuse a hop to a station the player is standing within SAFE metres
+    // of, and can cut short any walking step that would take it inside SAFE.
   }
 
   /**
@@ -665,10 +689,11 @@ export default class Level14 extends LevelBase {
     this._wrongSaid = false;
     this._idleT = 0;
     this._idleSaid = false;
-    this._heldT = 0;
-    this._heldSaid = false;
+    this._walkGoal = null;
+    this._walkSpeed = 1.6;
     this._saidOpen = false;
     this._fin = false;
+    this._gone = false;
     this._dreadEase = null;
     this._lastT = performance.now();
 
@@ -696,12 +721,21 @@ export default class Level14 extends LevelBase {
     // seconds, not in the engine's clamped frame delta. Below about 20 fps
     // that delta runs slow, and a figure that takes half a minute to cross
     // the tarmac because the renderer is struggling is not the beat.
+    //
+    // The 0.25 s ceiling is a sanity clamp on a stalled frame; XV uses 0.3 for
+    // the same thing. It used to be 0.1 s, which put the slow motion straight
+    // back into the room below 10 fps — the headless playtest draws at about
+    // 8 fps and lost a fifth of its wall clock to it. Two things make 0.25
+    // safe. The finale's walk is bounded exactly, for any dt at all, by
+    // _walkAllowance(). And a hop still needs minUnseen (0.6 s) of not being
+    // looked at, so no single frame can buy one however long it took to draw.
     this.tick(() => {
       const now = performance.now();
-      const rdt = Math.min((now - this._lastT) / 1000, 0.1);
+      const rdt = Math.min((now - this._lastT) / 1000, 0.25);
       this._lastT = now;
       this._puzzleStep(rdt);
       this._presenceStep(rdt);
+      this._veilStep();     // last: it needs where the figure ended up this frame
     });
   }
 
@@ -768,22 +802,119 @@ export default class Level14 extends LevelBase {
     const near = (v) => Math.hypot(pl.x - v.x, pl.z - v.z);
 
     if (this._walking) {
-      if (near(pres.figure.position) < SAFE) {
-        this._heldT += dt;
-        if (this._heldT > 7 && !this._heldSaid) {
-          this._heldSaid = true;
-          this.subtitle('It waits. It will not walk through you.', 5);
-        }
-        return;                                   // it stops rather than pass you
-      }
-      this._heldT = 0;
-      pres.update(dt);
+      const allowed = this._walkAllowance(dt);
+      // No step at all rather than one that would take it inside SAFE. In
+      // practice this holds for at most a frame: _veilStep runs later in the
+      // same tick and resolves the finale from 2.6 m, further out than the
+      // 2.25 m that zeroes the allowance.
+      if (allowed <= 0) return;
+      pres.update(allowed);
       return;
     }
 
+    // A hop is a teleport, not a walk: there is no path between the two
+    // stations for the figure to be caught on, so testing the station it is
+    // about to appear at is already a bound rather than a correction.
     const next = pres.stations[pres.index + 1];
     pres.enabled = this._allow && (!next || near(next) >= SAFE);
     pres.update(dt);
+  }
+
+  /**
+   * How much of this frame's `dt` the figure is allowed to spend walking.
+   *
+   * The invariant it buys: while the figure walks, no point on the straight
+   * line it sweeps during a frame is nearer than SAFE metres — measured on
+   * the ground plane, against where the player is standing at the top of the
+   * frame — for any dt the loop can hand us, a 16 ms frame or a one-second
+   * stall alike.
+   *
+   * Testing where the figure *is* would only be a correction: it would
+   * already be up to speed × dt past the line before the next frame noticed.
+   * So solve the whole step instead. Walking from F along the unit heading u,
+   * the squared gap after s metres is |w|² + 2s(w·u) + s² with w = F − P — a
+   * parabola in s, so its smallest value over the step is all we need.
+   *
+   *   w·u ≥ 0        the figure is already heading away; the gap only opens,
+   *                  so the whole step is fine (this is also how it gets out
+   *                  again if the player walks into it).
+   *   otherwise      the parabola meets SAFE² at
+   *                  s = −(w·u) − √((w·u)² − (|w|² − SAFE²)), and the figure
+   *                  may walk up to there and no further. A discriminant that
+   *                  is not positive means this line never comes that close,
+   *                  so again the whole step is fine.
+   *
+   * The root is the first crossing, so nothing between 0 and it is inside
+   * SAFE either; and it is derived from the continuous line rather than
+   * sampled along it, which is why dt does not enter the guarantee. When it
+   * comes out at or below zero the caller holds the figure still.
+   */
+  _walkAllowance(dt) {
+    const goal = this._walkGoal;
+    if (!goal) return dt;
+    const f = this._presence.figure.position;
+    const pl = this.game.player.position;
+    let ux = goal.x - f.x, uz = goal.z - f.z;
+    const len = Math.hypot(ux, uz);
+    if (len < 1e-6) return dt;                    // standing on it; Presence ends the leg
+    ux /= len; uz /= len;
+    const wx = f.x - pl.x, wz = f.z - pl.z;
+    const wu = wx * ux + wz * uz;
+    if (wu >= 0) return dt;
+    const disc = wu * wu - (wx * wx + wz * wz - SAFE * SAFE);
+    if (disc <= 0) return dt;
+    const reach = -wu - Math.sqrt(disc);          // metres left before the gap closes to SAFE
+    const step = this._walkSpeed * dt;
+    return reach >= step ? dt : Math.max(0, reach) / this._walkSpeed;
+  }
+
+  /** One leg of the finale walk, remembered so _walkAllowance can bound it. */
+  _walkLeg(to, speed, onDone) {
+    this._walkGoal = to;
+    this._walkSpeed = speed;
+    this._presence.walkTo(to, speed, onDone);
+  }
+
+  /**
+   * The figure is only ever a thing at a distance, so it is not drawn once the
+   * player is nearer than VEIL_GONE.
+   *
+   * The property: **no frame is ever rendered with the player inside
+   * VEIL_GONE metres of a visible figure, for any sequence of player inputs.**
+   * Three things give that:
+   *
+   *  - The main loop calls `player.update(dt)`, then the level, then draws. So
+   *    this runs after the player has finished moving for the frame and before
+   *    anything is on screen: `d` is the gap the frame is about to be drawn
+   *    with, and the player cannot move again in between.
+   *  - It is the last step of the level's tick, after _presenceStep, so the
+   *    figure has finished moving for the frame too.
+   *  - Nothing turns `visible` back on later in the frame. Presence only does
+   *    that inside placeAt() and walkTo(), which run either earlier in this
+   *    same tick or from an after() timer — and a timer cannot land between
+   *    here and the draw, because the whole update-and-draw is one animation
+   *    frame callback and JavaScript runs it to completion.
+   *
+   * Hysteresis, not one line: gone below VEIL_GONE, back only beyond
+   * VEIL_BACK. Anything drawn is therefore at least VEIL_GONE away either way.
+   *
+   * What happens below the line is the room's own grammar. Before the finale
+   * it simply is not there, and it is back once you give it room — which is
+   * the rule the whole room is built on. During the finale it cannot just wait
+   * you out, because the gate it is walking to unlock is the only way out, so
+   * closing the distance resolves the walk instead.
+   */
+  _veilStep() {
+    if (this._gone) return;
+    const f = this._presence.figure;
+    const pl = this.game.player.position;
+    const d = Math.hypot(pl.x - f.position.x, pl.z - f.position.z);
+    if (this._fin && d < VEIL_GONE) { this._resolveFinale(); return; }
+    if (f.visible) {
+      if (d < VEIL_GONE) f.visible = false;
+    } else if (d >= VEIL_BACK) {
+      f.visible = true;
+    }
   }
 
   _startPhase(i) {
@@ -799,13 +930,21 @@ export default class Level14 extends LevelBase {
       this._swingLoop.stop(0.3);
       this.cue('the swing stops', SWING);
     }
-    // the first time it stands in the open where you can see it
+    // the first time it stands in the open where you can see it. isSeen()
+    // does not care about `visible`, so wait for a look that lands on a figure
+    // the veil is actually drawing — otherwise you get told it is standing
+    // there while you are standing on the spot it is not.
     if (i === 4 && !this._saidOpen) {
       this._saidOpen = true;
-      this.whenSeen(
+      let off;
+      off = this.whenSeen(
         this._figure,
-        () => this.subtitle('It is standing in the open now. Closer. It does not move while you watch.', 6),
-        { occluders: this._occluders }
+        () => {
+          if (!this._figure.visible) return;
+          off?.();
+          this.subtitle('It is standing in the open now. Closer. It does not move while you watch.', 6);
+        },
+        { occluders: this._occluders, once: false }
       );
     }
 
@@ -836,27 +975,67 @@ export default class Level14 extends LevelBase {
     this.dread(1.0);
     this.subtitle('It does not come any closer. It never did.', 5);
 
-    this.after(4, () => {
+    this.after(4, () => this._setOff());
+  }
+
+  /** It stops waiting and walks for the gate. */
+  _setOff() {
+    if (this._gone) return;                     // you got to it during the hold
+    this._dreadEase = 1.0;
+    this._swingLoop = this.loopAt('swing', SWING);
+    this._swingLoop.setGain(0.4);
+    this._walking = true;
+    this._walkLeg(V(0, 0, -12.2), 1.6, () => {
+      this._unlockGate();
+      this._walkLeg(V(0, 0, -16), 1.6, () => this._goneOnAhead());
+    });
+  }
+
+  _unlockGate() {
+    if (this._gateOpen) return;
+    this.playSoundAt('unlock', PADLOCK);
+    this._padlock.visible = false;
+    this._gate.setOpen(true, -1);
+    this.removeColliderOf(this._gate.panel);
+    this._gateOpen = true;
+  }
+
+  /** The last of it: the lamp goes out and you are told to follow. */
+  _goneOnAhead() {
+    if (this._gone) return;
+    this._gone = true;
+    this._presence.hide();
+    this._walking = false;
+    this._walkGoal = null;
+    this._lamp.intensity = 0;
+    this.playSoundAt('clunk', LAMP);
+    this.setObjective('follow');
+    this.subtitle('It had the key. Of course it had the key.', 5);
+  }
+
+  /**
+   * You closed the distance during the finale, so it is not there — and its
+   * errand finishes anyway, because the gate it was walking to unlock is the
+   * only way out of the room and a figure that stood still and waited would
+   * strand you behind it.
+   *
+   * Every §5.4 FIN beat still fires, in order, with the same sounds and the
+   * same words: the swing's creak resumes and the dread eases, the padlock
+   * goes and the gate opens, the lamp goes out, the objective becomes
+   * 'follow', and it tells you it had the key. Only the walking time is cut.
+   * That is the reading that keeps the beats — letting it finish the walk
+   * invisibly would have it pass through you and open a padlock with nothing
+   * standing there, which reads as a fault rather than a beat.
+   */
+  _resolveFinale() {
+    if (this._gone) return;
+    if (this._dreadEase === null) {             // it had not set off yet
       this._dreadEase = 1.0;
       this._swingLoop = this.loopAt('swing', SWING);
       this._swingLoop.setGain(0.4);
-      this._walking = true;
-      this._presence.walkTo(V(0, 0, -12.2), 1.6, () => {
-        this.playSoundAt('unlock', PADLOCK);
-        this._padlock.visible = false;
-        this._gate.setOpen(true, -1);
-        this.removeColliderOf(this._gate.panel);
-        this._gateOpen = true;
-        this._presence.walkTo(V(0, 0, -16), 1.6, () => {
-          this._presence.hide();
-          this._walking = false;
-          this._lamp.intensity = 0;
-          this.playSoundAt('clunk', LAMP);
-          this.setObjective('follow');
-          this.subtitle('It had the key. Of course it had the key.', 5);
-        });
-      });
-    });
+    }
+    this._unlockGate();
+    this._goneOnAhead();
   }
 
   // ---------- playtest ----------
