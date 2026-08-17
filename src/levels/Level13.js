@@ -25,7 +25,8 @@ const GRADE = { vignette: 1.3, grain: 0.038, desat: 0.2, lift: 0.02, fringe: 0.0
 const NAMES = ['ada', 'tom', 'nell', 'ruth', 'sam', 'iris', 'joe', 'may', 'ben', 'lou', 'edie', '', 'kit', 'fay', 'ned', 'wren'];
 const PEG_Z = (i) => -2.5 - i * 0.3;              // pegs run z −2.5 … −7.0
 const LOCKER_Z = (n) => -6.2 - (n - 1) * 0.5;     // lockers 1..12, twelve at −11.7
-const STAGE_FRONT = -36.8;                        // stage top y 0.6, z −40 … −36.8
+const STAGE_FRONT = -36.8;                        // stage top y 0.6, z −40.2 … −36.8
+const STAGE_NOTCH = -37.9;                        // …except the corner by the fire door
 const LID_UP = -0.9, LID_DOWN = -0.15;            // the grand's lid, hinged at the back
 
 export default class Level13 extends LevelBase {
@@ -216,7 +217,9 @@ export default class Level13 extends LevelBase {
       text: 'FIRE DOOR\nkeep clear', width: 0.34, height: 0.2,
       font: 'bold 34px Georgia', bg: '#c9c2ae', color: '#3a3128',
     });
-    doorSign.position.set(0, 1.62, 1.955);
+    // above eye level (1.62): at eye height the interact prompt, drawn at screen
+    // centre when you look at the door, lands on top of the sign's own words
+    doorSign.position.set(0, 1.88, 1.955);
     doorSign.rotation.y = Math.PI;
     this.add(doorSign);
 
@@ -225,8 +228,11 @@ export default class Level13 extends LevelBase {
       color: 0x1d3a2a, emissive: 0x2f7a52, emissiveIntensity: 1.6,
     }), 0, 2.42, 1.94, { collide: false });
     void exitBox;
+    // 0.29 m further down the corridor than it used to sit. The sign moved up to
+    // 1.88, which put it close to this lamp and nearly face-on to it, and it
+    // washed out to white. From here the sign reads black on cream again.
     const exitLamp = new THREE.PointLight(0xaee0c6, 4.2, 7, 1.6);
-    exitLamp.position.set(0, 2.06, 1.44);
+    exitLamp.position.set(0, 2.06, 1.15);
     this.add(exitLamp);
 
     // the marker the lights set-piece watches: the way you came in
@@ -255,17 +261,32 @@ export default class Level13 extends LevelBase {
     this._box(1.2, 0.9, 0.04, new THREE.MeshStandardMaterial({ color: 0x5f4d36, roughness: 0.9 }),
       CW / 2 - 0.015, 1.55, 1.1, { collide: false }).rotation.y = -Math.PI / 2;
 
-    // a wet-floor sign a little way down the corridor
+    // a wet-floor sign a little way down the corridor: two moulded leaves that
+    // meet at the top, the lettering on the outward face of each. One texture,
+    // shared — the two leaves say the same thing.
+    const yellowMat = new THREE.MeshStandardMaterial({ color: 0xd5bf3a, roughness: 0.55 });
+    const wetFaceMat = new THREE.MeshStandardMaterial({
+      map: textTexture({
+        text: 'wet\nfloor', width: 256, height: 448,
+        font: 'bold 54px Georgia', bg: '#d5bf3a', color: '#2b2721',
+      }),
+      roughness: 0.55,
+    });
     const frame = new THREE.Group();
+    const lean = 0.22, halfH = 0.275;
     for (const s of [-1, 1]) {
-      const panel = makeSign({
-        text: 'wet\nfloor', width: 0.3, height: 0.5,
-        font: 'bold 40px Georgia', bg: '#d5bf3a', color: '#2b2721', doubleSided: true,
-      });
-      panel.position.set(0, 0.27, s * 0.07);
-      panel.rotation.x = s * 0.27;
-      if (s < 0) panel.rotation.y = Math.PI;
-      frame.add(panel);
+      // BoxGeometry material order is [+x, −x, +y, −y, +z, −z]: the outward
+      // face of each leaf carries the words, the other five are moulded plastic
+      const mats = [yellowMat, yellowMat, yellowMat, yellowMat,
+        s > 0 ? wetFaceMat : yellowMat, s > 0 ? yellowMat : wetFaceMat];
+      const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.3, halfH * 2, 0.028), mats);
+      leaf.castShadow = true;
+      leaf.receiveShadow = true;
+      // the +0.011 sets how far apart the feet stand; the tops just overlap, so
+      // the apex is closed and no light leaks through the join
+      leaf.position.set(0, halfH * Math.cos(lean), s * (halfH * Math.sin(lean) + 0.011));
+      leaf.rotation.x = -s * lean;               // tops converge, feet splay
+      frame.add(leaf);
     }
     frame.position.set(0.72, 0, -1.7);
     frame.rotation.y = 0.4;
@@ -930,13 +951,24 @@ export default class Level13 extends LevelBase {
       }
     }
 
-    // the stage
+    // The stage, in two slabs: the full-width back, and an apron in front of it
+    // that stops 1.6 m short of the east wall. The gap is the corner in front of
+    // the fire door — the stage top is 0.6 m up, and the fire doorway's head is
+    // at 2.1 m, so a player standing on the stage there would have 1.5 m of
+    // headroom and could not walk out. On the hall floor they have 2.1 m.
+    // Neither slab collides: 0.6 m is above the 0.55 m step-up, so a solid one
+    // would be a wall with no way over it. As ground, the downward raycast lifts
+    // the player and they walk up the front edge.
     const stageMat = makeMat('wood', { base: '#5f4a33', repeat: [8, 2] });
-    const stage = this._box(14, 0.6, 3.4, stageMat, 0, 0.3, -38.5);
-    this.addGround(stage);
-    const skirt = this._box(14, 0.06, 0.06,
-      new THREE.MeshStandardMaterial({ color: 0x33291d, roughness: 0.9 }), 0, 0.6, STAGE_FRONT, { collide: false });
-    void skirt;
+    const back = this._box(14, 0.6, 2.3, stageMat, 0, 0.3, -39.05, { collide: false });
+    this.addGround(back);
+    const apron = this._box(12.4, 0.6, 1.1, stageMat, -0.8, 0.3, -37.35, { collide: false });
+    this.addGround(apron);
+    // the lip along the exposed edges, including the two sides of the notch
+    const skirtMat = new THREE.MeshStandardMaterial({ color: 0x33291d, roughness: 0.9 });
+    this._box(12.4, 0.06, 0.06, skirtMat, -0.8, 0.6, STAGE_FRONT, { collide: false });
+    this._box(0.06, 0.06, 1.1, skirtMat, 5.4, 0.6, -37.35, { collide: false });
+    this._box(1.6, 0.06, 0.06, skirtMat, 6.2, 0.6, STAGE_NOTCH, { collide: false });
     // the curtain behind it: a backdrop with folds
     const curtainMat = new THREE.MeshStandardMaterial({ color: 0x4a2a2e, roughness: 1 });
     const foldMat = new THREE.MeshStandardMaterial({ color: 0x5a353a, roughness: 1 });
