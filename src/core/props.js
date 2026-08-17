@@ -116,6 +116,7 @@ export function makeDoor({
   door.userData.isDoor = true;
   let target = 0, angle = 0;
   door.setOpen = (open, dir = 1) => { target = open ? dir * Math.PI / 1.9 : 0; };
+  door.setAngle = (rad) => { target = rad; };
   door.isOpen = () => Math.abs(target) > 0.01;
   door.update = (dt) => {
     angle += (target - angle) * Math.min(1, 2.6 * dt);

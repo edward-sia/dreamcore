@@ -1,6 +1,10 @@
 const KEY = 'hiraeth-save-v1';
 
-const DEFAULTS = {
+// A function, not an object: the spreads below copy one level deep, so a shared
+// literal would hand every save the same `completed`, `times` and
+// `seenPrologues` arrays to push into — and reset() would then spread those
+// mutated arrays straight back in.
+const defaults = () => ({
   unlocked: 1,          // highest level available
   completed: [],        // level ids finished
   times: {},            // level id -> best completion time (seconds)
@@ -10,14 +14,16 @@ const DEFAULTS = {
   volume: 0.8,
   bloom: true,
   sawPrologue: false,
-};
+  captions: false,
+  seenPrologues: [],
+});
 
 export class SaveSystem {
   constructor() {
-    this.data = { ...DEFAULTS };
+    this.data = defaults();
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) this.data = { ...DEFAULTS, ...JSON.parse(raw) };
+      if (raw) this.data = { ...defaults(), ...JSON.parse(raw) };
     } catch { /* private mode etc. */ }
   }
 
@@ -46,6 +52,22 @@ export class SaveSystem {
     return Number.isFinite(t) ? t : null;
   }
 
+  /** Bring an older save up to date with a longer level list. */
+  migrate(totalLevels) {
+    // A tampered or corrupted entry can leave junk in `completed`. Math.max over
+    // a non-number is NaN, `id <= NaN` is always false, and every level would
+    // read as locked — so drop anything that is not a finite number first.
+    const done = Array.isArray(this.data.completed)
+      ? this.data.completed.filter((id) => Number.isFinite(id))
+      : [];
+    this.data.completed = done;
+    const maxDone = done.length ? Math.max(...done) : 0;
+    const want = Math.max(this.data.unlocked, maxDone + 1);
+    this.data.unlocked = Math.max(1, Math.min(want, totalLevels));
+    if (!Array.isArray(this.data.seenPrologues)) this.data.seenPrologues = [];
+    this.save();
+  }
+
   reset() {
     // "begin again" restarts the dream but keeps settings, best times
     // (they are records, like speedrun PBs) and the leaderboard identity.
@@ -56,8 +78,9 @@ export class SaveSystem {
       sensitivity: this.data.sensitivity,
       volume: this.data.volume,
       bloom: this.data.bloom,
+      captions: this.data.captions,
     };
-    this.data = { ...DEFAULTS, ...keep };
+    this.data = { ...defaults(), ...keep };
     this.save();
   }
 }

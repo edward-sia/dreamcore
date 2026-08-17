@@ -276,6 +276,78 @@ export function noiseMap({ size = 256, strength = 40, base = 128, repeat = [2, 2
   return finalize(c, { repeat, srgb: false });
 }
 
+// ---------- chalk & photographs (rooms XII, XV) ----------
+
+/**
+ * A chalk tally and a few chalk words on a concrete-coloured square.
+ * The returned texture has .redraw({ tally, lines }) — planes sharing it change together.
+ */
+export function chalkTexture({ tally = 0, lines = [], size = 512, base = '#5a5852', chalk = '#e8e4d8' } = {}) {
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size / 2;
+  const ctx = c.getContext('2d');
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  const jitter = (i, k) => (((i * 31 + k * 17) % 11) - 5) * 0.6;   // deterministic wobble
+  const draw = ({ tally: n = tally, lines: ls = lines } = {}) => {
+    const w = c.width, h = c.height;
+    ctx.fillStyle = base;
+    ctx.fillRect(0, 0, w, h);
+    stains(ctx, w, 6);
+    ctx.strokeStyle = chalk;
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < n; i++) {
+      const grp = Math.floor(i / 5), k = i % 5, sx = 30 + grp * 96;
+      ctx.beginPath();
+      if (k < 4) {
+        ctx.moveTo(sx + k * 18 + jitter(i, 0), 34 + jitter(i, 1));
+        ctx.lineTo(sx + k * 18 + jitter(i, 2), 92 + jitter(i, 3));
+      } else {
+        ctx.moveTo(sx - 8 + jitter(i, 0), 84 + jitter(i, 1));
+        ctx.lineTo(sx + 66 + jitter(i, 2), 42 + jitter(i, 3));
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = chalk;
+    ctx.font = 'italic 44px Georgia';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ls.forEach((line, i) => ctx.fillText(line, 30, 150 + i * 56));
+    ctx.globalAlpha = 1;
+    tex.needsUpdate = true;
+  };
+  draw();
+  tex.redraw = draw;
+  return tex;
+}
+
+/** The photograph motif from rooms I and V: figures too blurred to name. */
+export function blurredPhotoTexture({ figures = 2, width = 128, height = 96 } = {}) {
+  const c = document.createElement('canvas');
+  c.width = width; c.height = height;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, width, height);
+  g.addColorStop(0, '#9b9184');
+  g.addColorStop(1, '#6e675c');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = 'rgba(60,55,48,0.55)';
+  for (let f = 0; f < figures; f++) {
+    const x = width * (0.5 + (f - (figures - 1) / 2) * 0.28);
+    ctx.beginPath(); ctx.ellipse(x, height * 0.55, 9, 16, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, height * 0.33, 6, 7, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.filter = 'blur(2px)';
+  ctx.drawImage(c, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 // ---------- material helper ----------
 
 /**

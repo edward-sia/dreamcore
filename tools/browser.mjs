@@ -1,9 +1,48 @@
 // Shared headless-browser harness: boots a Vite dev server in-process and a
-// headless Chromium (preinstalled at /opt/pw-browsers) with software WebGL.
+// headless Chromium with software WebGL. The browser is found in this order:
+// $CHROMIUM_PATH, /opt/pw-browsers/chromium, then Playwright's own cache.
 import { createServer } from 'vite';
 import { chromium } from 'playwright-core';
+import { existsSync, readdirSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
-const EXECUTABLE = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
+function listDir(p) {
+  try { return readdirSync(p); } catch { return []; }
+}
+
+export function findChromium() {
+  if (process.env.CHROMIUM_PATH) return process.env.CHROMIUM_PATH;
+  if (existsSync('/opt/pw-browsers/chromium')) return '/opt/pw-browsers/chromium';
+  const roots = [
+    join(homedir(), 'Library', 'Caches', 'ms-playwright'),   // macOS
+    join(homedir(), '.cache', 'ms-playwright'),               // linux
+  ];
+  const candidates = [];
+  for (const root of roots) {
+    for (const d of listDir(root).sort().reverse()) {          // newest build first
+      const base = join(root, d);
+      if (d.startsWith('chromium_headless_shell-')) {
+        for (const sub of listDir(base)) candidates.push(join(base, sub, 'chrome-headless-shell'));
+      } else if (d.startsWith('chromium-')) {
+        for (const sub of listDir(base)) {
+          candidates.push(join(base, sub, 'Chromium.app', 'Contents', 'MacOS', 'Chromium'));
+          candidates.push(join(base, sub, 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'));
+          candidates.push(join(base, sub, 'chrome'));
+        }
+      }
+    }
+  }
+  return candidates.find((c) => existsSync(c)) ?? null;
+}
+
+const EXECUTABLE = findChromium();
+if (!EXECUTABLE) {
+  throw new Error(
+    'No Chromium found. Set CHROMIUM_PATH to a Chromium/Chrome binary ' +
+    '(Playwright\'s chrome-headless-shell works: npx playwright install chromium).'
+  );
+}
 
 export async function launch({ port = 5199 } = {}) {
   const server = await createServer({

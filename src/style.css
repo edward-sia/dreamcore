@@ -89,6 +89,13 @@ html, body {
   transition: opacity 0.8s ease;
 }
 
+#subtitle.cue {
+  font-style: normal;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  color: var(--ghost-dim);
+}
+
 #hint-keys {
   position: absolute; bottom: 22px; right: 32px;
   color: rgba(238,233,222,0.28);
@@ -184,6 +191,14 @@ html, body {
   transition: opacity 1.6s ease;
 }
 #fade.slow { transition-duration: 3.2s; }
+
+#flash {
+  position: fixed; inset: 0; z-index: 9;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
 
 #titlecard {
   position: fixed; inset: 0; z-index: 61;

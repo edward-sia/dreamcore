@@ -1,6 +1,6 @@
 // Level registry. Levels register themselves by filename — Level01.js …
-// Level10.js — so ten files can be authored independently without ever
-// touching a shared file.
+// Level15.js — so rooms can be authored independently without ever touching
+// a shared file.
 
 const modules = import.meta.glob('./Level*.js', { eager: true });
 
@@ -22,7 +22,8 @@ export const PROLOGUE =
 
 export const EPILOGUE =
   'You open your eyes.\n\n' +
-  'The ceiling of your own room. Morning, or nearly.\n' +
-  'The house is gone. The pool, the field, the train.\n\n' +
-  'You carry them anyway.\n' +
-  'That is what carrying is for.';
+  'The ceiling of your own room. Morning.\n' +
+  'This time it stays.\n\n' +
+  'Somewhere, in a house that is gone, someone turns off the last light —\n' +
+  'the one that was left on for you —\n' +
+  'and goes to bed.';

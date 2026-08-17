@@ -64,6 +64,8 @@ const DreamGradeShader = {
   `,
 };
 
+const BASE_GRADE = { vignette: 1.15, grain: 0.026, desat: 0.16, lift: 0.025, fringe: 0.00045 };
+
 export class Engine {
   constructor(container) {
     this.container = container;
@@ -100,6 +102,9 @@ export class Engine {
     this.gradePass = new ShaderPass(DreamGradeShader);
     this.composer.addPass(this.gradePass);
 
+    this._grade = { ...BASE_GRADE };
+    this._pulse = null;
+
     this._clock = new THREE.Clock();
     this._updaters = new Set();
     this._running = false;
@@ -115,6 +120,26 @@ export class Engine {
 
   setBloomEnabled(on) {
     this.bloomPass.enabled = on;
+  }
+
+  /** Per-level grade override (partial keys: vignette grain desat lift fringe). null → base. */
+  setGrade(partial) {
+    this._grade = { ...BASE_GRADE, ...(partial || {}) };
+    this._applyGrade(this._grade);
+  }
+
+  _applyGrade(g) {
+    const u = this.gradePass.uniforms;
+    u.uVignette.value = g.vignette;
+    u.uGrain.value = g.grain;
+    u.uDesat.value = g.desat;
+    u.uLift.value = g.lift;
+    u.uFringe.value = g.fringe;
+  }
+
+  /** A one-blink spike of grain / fringe / desaturation that eases back over `duration` seconds. */
+  pulseGrade({ grain = 0.3, fringe = 0.008, desat = 0.6, duration = 0.35 } = {}) {
+    this._pulse = { t: 0, duration, grain, fringe, desat };
   }
 
   onUpdate(fn) {
@@ -137,6 +162,17 @@ export class Engine {
   _frame() {
     const dt = Math.min(this._clock.getDelta(), 0.05) * this.timeScale;
     const t = this._clock.elapsedTime;
+    if (this._pulse) {
+      const p = this._pulse;
+      p.t += dt;
+      const k = Math.min(1, p.t / p.duration);
+      const e = 1 - Math.pow(1 - k, 3);          // ease-out cubic
+      const u = this.gradePass.uniforms, g = this._grade;
+      u.uGrain.value = p.grain + (g.grain - p.grain) * e;
+      u.uFringe.value = p.fringe + (g.fringe - p.fringe) * e;
+      u.uDesat.value = p.desat + (g.desat - p.desat) * e;
+      if (k >= 1) { this._pulse = null; this._applyGrade(g); }
+    }
     this.gradePass.uniforms.uTime.value = t;
     for (const fn of this._updaters) fn(dt, t);
     this.composer.render();

@@ -16,6 +16,7 @@ roughly one minute per room. The dream starts indoors and close
 (hallway, pool), breathes outward (street, field), passes through
 in-between places (supermarket, platform, theater), turns inward to
 memory itself (house, archive), and ends at the edge of waking (shore).
+Five more follow after a false wake — see Phases 5–7 (XI–XV), below.
 
 | # | numeral | title | mood | phase |
 |---|---|---|---|---|
@@ -29,6 +30,11 @@ memory itself (house, archive), and ends at the edge of waking (shore).
 | 8 | VIII | The Theater | `theater` | 4 |
 | 9 | IX | The Archive | `archive` | 4 |
 | 10 | X | The Shore | `shore` | 4 |
+| 11 | XI | The Bedroom | `night` | 5 |
+| 12 | XII | The Stairwell | `stairwell` | 5 |
+| 13 | XIII | The School | `school` | 6 |
+| 14 | XIV | The Playground | `playground` | 6 |
+| 15 | XV | Under the House | `under` | 7 |
 
 Phases group rooms by puzzle grammar, per the difficulty ladder:
 
@@ -39,6 +45,8 @@ Phases group rooms by puzzle grammar, per the difficulty ladder:
 - **Phase 4 — remember (VIII–X):** multi-stage chains, cross-referenced
   clues, and a finale that recombines the mechanics of everything
   before it.
+- **Phases 5–7 — doubt (XI–XV):** the room misleads you; listening is a
+  mechanic. Full design: `docs/superpowers/specs/2026-08-16-rooms-xi-xv-design.md`.
 
 ## Canon — facts more than one room depends on
 
@@ -67,6 +75,22 @@ them; room IX quotes four of them back.
   counted on your fingers **6** → **4236**.
 - **X:** three tokens come home: a brass key (I, cold now), a tile from
   the deep end (II), a ticket stub (VIII).
+- **3:07** — the bedroom clock. It never changes.
+- **Knocks:** two = "still there" · three = "come and find me". (XI
+  teaches it; XIV and XV pay it off.)
+- **XII:** the stairs repeat −1, −2, −3. Chalk on the −2 landing: a
+  tally, and "wait for me".
+- **XIII:** your peg and locker are **12**. The tune is **E G A G E G
+  E**; the board holds the first five, the tannoy chime is the last two
+  (**G, E**).
+- **XIV:** the hiding order is **the pipe → behind the shed → behind
+  the shelter**.
+- **XV:** V's evening order — **kitchen → hall → sitting room → your
+  room** — flipped by ear. The box from IX gives up a photograph, the
+  ribbon from VI, and the brass key from I, **warm again**.
+- **Humming.** I and III mention "the song your mother hummed". It is
+  this tune. It is heard, hummed, twice: faintly behind the bedroom
+  door (XI) and from the doorway of light at the very end (XV).
 
 ## The rooms
 
@@ -257,7 +281,16 @@ mechanics.
 3. **wake** — through the door, the beach continues but brighter; the
    fog lifts as you walk the last stretch to the waterline while
    subtitles let go, one line at a time. Reaching the water completes
-   the level — and the game (the epilogue in `levels/index.js` plays).
+   the level. It no longer ends the game — see **Rooms XI–XV**, below.
+
+## Rooms XI–XV — the five beneath
+
+A false awakening after the Shore. Bedroom (3:07, the knock code),
+Stairwell (the loop; stand still), School (the plates lie; play the
+tune), Playground (hide so it can come), Under the House (the evening
+order by ear; the box; the meeting). Every layout, puzzle, text and cue
+is in the spec above; the same production notes apply (one file per
+room, ports 51NN/52NN, full-suite gate 15/15).
 
 ## Production notes
 
@@ -270,5 +303,5 @@ mechanics.
 - Ports are per-room (51NN / 52NN) so rooms can be verified in
   parallel.
 - Phase gate: after each phase, the full suite (`npm run playtest`)
-  must pass 10/10 (or all-shipped/all-shipped) before the next phase
+  must pass 15/15 (or all-shipped/all-shipped) before the next phase
   begins.
