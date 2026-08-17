@@ -11,6 +11,12 @@ import { makeDoor, makeWall, makeBulbLight, makeSign, makeDust, applyFog } from 
 // Design: docs/superpowers/specs/2026-08-16-rooms-xi-xv-design.md §5.2
 
 const FLOOR_H = 2.72, HALF_H = 1.36, RISE = 0.17, RUN = 0.28, STEPS = 8;
+// A step is a box hanging under its tread. Consecutive boxes are 0.17 apart
+// and 0.24 deep, so the soffit under a flight is closed and stepped, the way a
+// cast concrete flight is — and a fifth of the fill rate of the 0.6 m blocks
+// that were here, which mattered: this shaft is drawn in software by the
+// screenshot and playtest harnesses.
+const TREAD = 0.24;
 const X0 = -3.2, X1 = 3.2, MAIN_X1 = -1.0, HALF_X0 = 1.24, ZW = 1.3;   // shaft plan
 
 const LANDINGS = [
@@ -50,8 +56,12 @@ export default class Level12 extends LevelBase {
 
     this._concrete = makeMat('concrete', { base: '#7a766f', repeat: [2, 2] });
     this._shaftMat = makeMat('concrete', { base: '#726e68', repeat: [3, 10] });
-    this._floorMat = makeMat('concrete', { base: '#5e5b55', repeat: [1, 1] });
-    this._stepMat = makeMat('concrete', { base: '#6f6b63', repeat: [1, 1] });
+    // Floors face up, so the only light they get is from a bulb 2.3 m over
+    // their heads at a steep angle. The spec's '#5e5b55' left every landing and
+    // every tread reading black under that; these are the same grey opened up
+    // until the stairs are legible from the landing above them.
+    this._floorMat = makeMat('concrete', { base: '#7d786f', repeat: [1, 1] });
+    this._stepMat = makeMat('concrete', { base: '#8a8479', repeat: [1, 1] });
     // painted steel, not bare metal: there is no environment map in this room,
     // so anything with a high metalness renders black
     this._railMat = new THREE.MeshStandardMaterial({ color: 0x8d949a, roughness: 0.42, metalness: 0.18 });
@@ -72,10 +82,19 @@ export default class Level12 extends LevelBase {
       body: '1 stroke. and, underneath: wait for me.',
     };
 
-    this.add(new THREE.HemisphereLight(0x5c6068, 0x16181c, 0.6));
-    // the air of the shaft: motes that only show where a bulb reaches
+    // Concrete bounces, and a shaft is mostly surfaces facing each other, so
+    // the ambient term does more work here than in a room with a window. The
+    // ground colour is what lights every downward face — the ceiling, the
+    // soffits under the flights — and a near-black one leaves them as holes,
+    // which is what a lot of the old spawn frame was. Above the 0.3–0.6 the
+    // level API suggests, for the same reason Level03 is.
+    this.add(new THREE.HemisphereLight(0x6a6f78, 0x46443f, 2.0));
+    // the air of the shaft: motes that only show where a bulb reaches. They
+    // are blended sprites over the whole 28 m of shaft, most of them out of
+    // sight, and at 420 they were costing a third of the frame rate on the
+    // software renderer the harnesses use — 220 reads the same.
     const dust = makeDust({
-      count: 420, size: 0.013,
+      count: 220, size: 0.013,
       box: [6.2, SHAFT_TOP - SHAFT_BOT, 2.4],
       center: [0, (SHAFT_TOP + SHAFT_BOT) / 2, 0],
     });
@@ -83,6 +102,7 @@ export default class Level12 extends LevelBase {
     this.track(dust);
 
     LANDINGS.forEach((L, i) => this._buildFloor(i, L));
+    this._buildUpFlight(LANDINGS[0].y);
 
     // Below the last landing the shaft keeps going, unlit, so nothing bottoms
     // out in view. The loop catches the player long before they get down here.
@@ -159,8 +179,8 @@ export default class Level12 extends LevelBase {
     // south flight (z −1.3..0): eight steps east and down, main landing → half-landing
     for (let k = 0; k < STEPS; k++) {
       const top = y - RISE * (k + 1);
-      this._box(RUN, 0.6, ZW, this._stepMat,
-        MAIN_X1 + RUN * (k + 0.5), top - 0.3, -ZW / 2, { ground: true });
+      this._box(RUN, TREAD, ZW, this._stepMat,
+        MAIN_X1 + RUN * (k + 0.5), top - TREAD / 2, -ZW / 2, { ground: true });
     }
     // the half-landing on the east
     this._box(X1 - HALF_X0, 0.2, ZW * 2, this._floorMat,
@@ -168,8 +188,8 @@ export default class Level12 extends LevelBase {
     // north flight (z 0..1.3): eight steps west and down, half-landing → next landing
     for (let k = 0; k < STEPS; k++) {
       const top = y - HALF_H - RISE * (k + 1);
-      this._box(RUN, 0.6, ZW, this._stepMat,
-        HALF_X0 - RUN * (k + 0.5), top - 0.3, ZW / 2, { ground: true });
+      this._box(RUN, TREAD, ZW, this._stepMat,
+        HALF_X0 - RUN * (k + 0.5), top - TREAD / 2, ZW / 2, { ground: true });
     }
     // handrails down both edges of each flight: the well side and the wall
     this._handrail(MAIN_X1, y, HALF_X0, y - HALF_H, -0.07);
@@ -179,6 +199,33 @@ export default class Level12 extends LevelBase {
     // the well between the flights stays open, the way a dog-leg stair's is —
     // it is how you see the stairs continue. _buildShell puts an invisible
     // sheet down it so you cannot step across.
+  }
+
+  /**
+   * The flight up out of the top landing, and the concrete where the rest of
+   * it should be.
+   *
+   * Every other landing in this shaft has a flight over it — the one that
+   * comes down to it from the floor above. The top one did not, which is why
+   * the view from the spawn was a bare tube: the flight down starts 1.1 m
+   * ahead and 0.17 m below the eye, so with a 68° field of view no tread of it
+   * is ever in frame from a standing player, and there was nothing else at eye
+   * level but wall. This is the mirror of `_buildFlights`: eight steps rising
+   * east on the north side. Where the half-landing above them belongs there is
+   * poured concrete instead — the floors over this one are not there any more —
+   * which stops the climb about a metre up and gives the half-landing below a
+   * ceiling 2.72 m over its floor, the same as every other one has.
+   */
+  _buildUpFlight(y) {
+    for (let k = 0; k < STEPS; k++) {
+      const top = y + RISE * (k + 1);
+      this._box(RUN, TREAD, ZW, this._stepMat,
+        MAIN_X1 + RUN * (k + 0.5), top - TREAD / 2, ZW / 2, { ground: true });
+    }
+    this._box(X1 - HALF_X0 + 0.2, SHAFT_TOP - (y + HALF_H), ZW * 2, this._concrete,
+      (X1 + HALF_X0) / 2 + 0.1, (y + HALF_H + SHAFT_TOP) / 2, 0);
+    this._handrail(MAIN_X1, y, HALF_X0, y + HALF_H, 0.07);
+    this._handrail(MAIN_X1, y, HALF_X0, y + HALF_H, ZW - 0.09, { wall: 1 });
   }
 
   /** Outer walls, ceiling, and the west wall above and below the labelled floors. */
@@ -230,28 +277,35 @@ export default class Level12 extends LevelBase {
     this.add(plan);
     this.interact(plan, { prompt: 'the fire plan', onInteract: () => this.subtitle('do not run.', 3) });
 
-    // caged bulb over the landing, a dimmer one over the half-landing
-    const bulb = makeBulbLight({ color: 0xd8dcd0, intensity: 3.2, distance: 7, y: 2.45 });
+    // Caged bulb over the landing, a dimmer one over the half-landing. The
+    // spec's `distance: 7` is a corridor figure: with three-floor sightlines
+    // it left everything past four metres unlit, so the shaft read as a black
+    // tube with one bulb in it. The reach goes to 11 m; the intensity stays at
+    // the spec's 3.2, which is what keeps the landing itself gloomy.
+    const bulb = makeBulbLight({ color: 0xd8dcd0, intensity: 3.2, distance: 11, y: 2.45 });
     bulb.position.set(-2.1, y, 0);
     if (i === 3) {
-      // the shaft's one shadow-caster. A point light draws the scene six times
-      // for its cube map, so keep the map small — fog and grade hide the edges.
+      // The shaft's one shadow-caster. A point light draws the scene six times
+      // for its cube map, which at this mesh count costs a quarter of the frame
+      // rate; nothing in the shaft moves, so it is drawn once and then frozen.
       bulb.light.castShadow = true;
       bulb.light.shadow.mapSize.set(256, 256);
       bulb.light.shadow.bias = -0.004;
       bulb.light.shadow.normalBias = 0.04;
+      bulb.light.shadow.autoUpdate = false;
+      bulb.light.shadow.needsUpdate = true;
     }
     this.add(bulb);
-    this._bulbs[i] = this._gate(bulb.light, 3.2, 4.8, -2.1, y + 2.3, 0);
+    this._bulbs[i] = this._gate(bulb.light, 3.2, 5.6, -2.1, y + 2.3, 0);
     if (i === 2 || i === 6) this._stutter(this._bulbs[i]);
     if (i < LAST) {
-      // the spec's 1.4 left the far half of the shaft unreadable from a
-      // landing — 2.6 over 8 m keeps it dimmer than the landing bulb and
-      // still puts a floor under the half-landing
-      const half = makeBulbLight({ color: 0xd8dcd0, intensity: 2.6, distance: 8, y: 2.3 });
+      // the spec's 1.4 over 5 m left the far half of the shaft unreadable from
+      // a landing; 3.2 over 12 m is the only thing lighting the flights and the
+      // half-landing you look down at from the landing above
+      const half = makeBulbLight({ color: 0xd8dcd0, intensity: 3.2, distance: 12, y: 2.3 });
       half.position.set((X1 + HALF_X0) / 2, y - HALF_H, 0);
       this.add(half);
-      this._gate(half.light, 2.6, 5.4, (X1 + HALF_X0) / 2, y - HALF_H + 2.15, 0);
+      this._gate(half.light, 3.2, 6.0, (X1 + HALF_X0) / 2, y - HALF_H + 2.15, 0);
     }
 
     if (i === 0) { this._buildWardrobeBack(y); return; }
@@ -348,7 +402,7 @@ export default class Level12 extends LevelBase {
     const light = new THREE.PointLight(0xfff1d6, 0, 6, 1.8);
     light.position.set(STUB_END_X, y + 2.0, 0);
     this.add(light);
-    const rec = this._gate(light, 2.2, 9, STUB_END_X, y + 2.0, 0);
+    const rec = this._gate(light, 2.2, 6.5, STUB_END_X, y + 2.0, 0);
     rec.on = 0;
     this._stubLights[i] = { glow, light, glassMat, rec, label: L.label };
   }
@@ -448,10 +502,23 @@ export default class Level12 extends LevelBase {
     this._toldOnce = false;
     this._done = false;
     this._exitIdx = null;
+    this._tPrev = null;
     this.dread(0.15);
 
-    this.tick((dt) => {
+    // The room's clock. `dt` is the engine's simulation step and is clamped at
+    // 50 ms, so below 20 fps it runs slower than the world does: eight seconds
+    // of stillness becomes twenty-five seconds of standing there on a slow
+    // machine, and the approach drags with it. `t` is real elapsed seconds, so
+    // every beat in here — the stillness, the approach, the footstep cadence —
+    // is measured off that instead, and takes as long as the spec says it
+    // does whatever the frame rate is. The 0.25 cap keeps one long frame (a
+    // texture upload, an alt-tab) from handing the player free seconds.
+    this.tick((dt, t) => {
       const pl = this.game.player;
+      // A paused game is not a player standing still, so the clock stops with
+      // them: `frozen` is set by the pause overlay and by any open modal.
+      const rdt = this._tPrev === null || pl.frozen ? 0 : Math.min(0.25, t - this._tPrev);
+      this._tPrev = t;
       const footY = pl.position.y - 1.62;
       const v = Math.hypot(pl.velocity.x, pl.velocity.z);
 
@@ -472,12 +539,12 @@ export default class Level12 extends LevelBase {
         return;
       }
 
-      if (this._approach) { this._runApproach(dt, v); return; }
+      if (this._approach) { this._runApproach(rdt, v); return; }
 
       // footsteps one flight below while you walk; one more when you stop
       if (v > 0.5) {
         this._wasMoving = true;
-        this._stepAcc += dt;
+        this._stepAcc += rdt;
         if (this._stepAcc > 0.62) { this._stepAcc = 0; this._stepBelow(); }
       } else if (this._wasMoving) {
         this._wasMoving = false;
@@ -485,7 +552,7 @@ export default class Level12 extends LevelBase {
       }
 
       // stillness
-      if (v < 0.05 && !this.game.ui.modalOpen) this._still += dt; else this._still = 0;
+      if (v < 0.05 && !this.game.ui.modalOpen) this._still += rdt; else this._still = 0;
       if (this._still >= 8) {
         this._still = 0;
         if (footY > -8.0) {
@@ -543,9 +610,9 @@ export default class Level12 extends LevelBase {
     this._approach = { t: 0, i: 0, breath: false, done: false, landing: this._nearestLandingBelow() };
   }
 
-  _runApproach(dt, v) {
+  _runApproach(rdt, v) {
     const a = this._approach;
-    a.t += dt;
+    a.t += rdt;                                  // real seconds, as above
     if (v > 0.3 && a.t < 6.0) { this._retreat(); return; }
 
     while (a.i < 10 && a.t >= a.i * 0.6) {
@@ -610,13 +677,22 @@ export default class Level12 extends LevelBase {
 
   // ---------- playtest ----------
 
+  /** Wait, a fifth of a second at a time, until `ready()` or `limit` seconds. */
+  async _debugUntil(ready, limit) {
+    for (let waited = 0; waited < limit && !ready(); waited += 0.2) await this.debugWait(0.2);
+  }
+
   async debugSolve() {
     const pl = this.game.player;
     // walk down to the −1 landing and stand there
     pl.teleport(-2.1, 0, pl.yaw, LANDINGS[3].y);
     await this.debugWait(0.4);
-    await this.debugWait(8.8);      // eight seconds still, and it starts up the flight
-    await this.debugWait(7.0);      // it arrives; the −1 door clicks and swings
+    // stand still. Nothing else solves this room: eight seconds of stillness
+    // start it up the flight, and six and a half more bring it to the landing
+    // and open the door. Both are real seconds and are polled rather than
+    // slept through, because the player may already have been standing here.
+    await this._debugUntil(() => this._approach, 14);
+    await this._debugUntil(() => this._done, 12);
     // through the door, down the corridor, past the light
     pl.teleport(-5.0, 0, pl.yaw);
     await this.debugWait(0.4);
