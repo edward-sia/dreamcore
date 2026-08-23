@@ -1139,9 +1139,9 @@ stair path one storey up — and slaved to you: as you go down, W goes down
 above you, always exactly two flights; `smallStep` at W's position every 0.5 s while your planar
 speed > 0.5 (cue the first: `'small footsteps, above you'`); when you stop,
 one more step 0.5 s later, then nothing. W never comes closer than two
-flights: when you climb toward it, it stops (`'It stops, above you. It will
-come no closer than that.'`, once per 20 s) and a `Box3` on W's flight
-blocks you. W is shown — a `makeChild()` at W's position, lit by the
+flights: it is slaved to your place on the path, so climbing toward it
+moves it up and away, and `'It stops, above you. It will come no closer
+than that.'` plays (once per 20 s) while you keep climbing. W is shown — a `makeChild()` at W's position, lit by the
 landing bulbs, facing down the flight — seen only from below, at a
 distance, through the banisters.
 
