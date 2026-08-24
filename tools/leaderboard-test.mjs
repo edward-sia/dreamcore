@@ -114,7 +114,13 @@ try {
   console.error('  FAIL — unexpected error:', err.message);
 }
 
-child?.kill('SIGTERM');
+// Wait for the server to exit before removing its data dir: it flushes the
+// store on SIGTERM, and deleting under it made the run fail after the checks.
+if (child) {
+  const exited = new Promise((r) => child.once('exit', r));
+  child.kill('SIGTERM');
+  await Promise.race([exited, new Promise((r) => setTimeout(r, 3000))]);
+}
 if (dataDir) rmSync(dataDir, { recursive: true, force: true });
 console.log(failures ? `\n${failures} failure(s)` : '\nall leaderboard checks passed');
 process.exit(failures ? 1 : 0);

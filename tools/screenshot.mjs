@@ -18,14 +18,24 @@ try {
   await loadLevel(page, url, level);
 
   if (hour) {
-    const ok = await page.evaluate((h) => {
+    const status = await page.evaluate((h) => {
       const hrs = window.__game.level?.hours;
-      if (!hrs) return false;
-      hrs.set(h);
-      return true;
+      if (!hrs) return 'no-hours';
+      if (hrs.current === h) return 'already';
+      return hrs.set(h) ? 'set' : 'refused';
     }, hour);
-    if (!ok) throw new Error(`level ${level} has no hours (set --hour only on rooms XVI–XX)`);
-    await page.waitForTimeout(2500);          // the 1.6 s crossfade, then a beat
+    if (status === 'no-hours') throw new Error(`level ${level} has no hours (set --hour only on rooms XVI–XX)`);
+    // A refused set would leave the room at the hour it was already at and
+    // write a shot named for an hour it does not show — fail instead.
+    if (status === 'refused') throw new Error(`level ${level} would not go to '${hour}' (hours: night, morning, evening)`);
+    if (status === 'set') {
+      await page.waitForFunction(
+        (h) => window.__game.level?.hours?.current === h && !window.__game.level.hours.changing,
+        hour,
+        { timeout: 15000 },
+      );
+      await page.waitForTimeout(600);         // the lights finish arriving after the blink
+    }
   }
 
   const pad = String(level).padStart(2, '0');
