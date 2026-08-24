@@ -35,6 +35,11 @@ Five more follow after a false wake — see Phases 5–7 (XI–XV), below.
 | 13 | XIII | The School | `school` | 6 |
 | 14 | XIV | The Playground | `playground` | 6 |
 | 15 | XV | Under the House | `under` | 7 |
+| 16 | XVI | The Kitchen | `night` | 8 |
+| 17 | XVII | The Hall | `night` | 8 |
+| 18 | XVIII | The Sitting Room | `night` | 9 |
+| 19 | XIX | The Stairs | `stairwell` | 9 |
+| 20 | XX | The Room | `night` | 10 |
 
 Phases group rooms by puzzle grammar, per the difficulty ladder:
 
@@ -47,6 +52,9 @@ Phases group rooms by puzzle grammar, per the difficulty ladder:
   before it.
 - **Phases 5–7 — doubt (XI–XV):** the room misleads you; listening is a
   mechanic. Full design: `docs/superpowers/specs/2026-08-16-rooms-xi-xv-design.md`.
+- **Phases 8–10 — leave (XVI–XX):** the room exists at three hours and you
+  are on her side of it; you make the clue and the child's dream tests it.
+  Full design: `docs/superpowers/specs/2026-08-23-rooms-xvi-xx-design.md`.
 
 ## Canon — facts more than one room depends on
 
@@ -91,6 +99,29 @@ them; room IX quotes four of them back.
 - **Humming.** I and III mention "the song your mother hummed". It is
   this tune. It is heard, hummed, twice: faintly behind the bedroom
   door (XI) and from the doorway of light at the very end (XV).
+- **The hours:** half past eight (her evening), **3:07** (the night), a
+  quarter past seven (the morning). Clocks are pushed forward by hand and
+  rest only at those three. Doors onward open at 3:07 only. What you put
+  down at another hour does not stay. The morning's doorways are white.
+- **XVI:** the fuse box, left to right: **porch · sitting room · kitchen ·
+  your room · hall** (XV's order). The pan stays on the range. The little
+  key on the table.
+- **XVII:** the spare key where the flowers used to be; the note on the
+  table by the door; her slippers on the mat at the stair foot. The hall
+  at 3:07 is the corridor of I, doors 203–212.
+- **XVIII:** the wireless is tuned to **247** metres. It plays the tune
+  (E G A G E G E). The child carries a torch.
+- **XIX:** eight boxes, eight cards (IX's facts). The box is crossed out
+  **twice**. The stub lights go **−3, then −2, then −1** — one door closer
+  each loop. The chalk says **wait for me**.
+- **XX:** XI's starting state: the chair to the desk, the sheet over the
+  mirror, the music box wound, the note in the drawer, the clock stopped at
+  3:07, the door locked from the other side. The landing light is left on.
+- **The child:** never named. It hums the tune. It is heard in XVI (turning
+  over), rehearsed in XVII, seen with a torch in XVIII, followed in XIX,
+  asleep in XX.
+- **M.:** at the evening hour she has always just left. Her lists. Her coat
+  is warm. Never seen.
 
 ## The rooms
 
@@ -292,6 +323,17 @@ order by ear; the box; the meeting). Every layout, puzzle, text and cue
 is in the spec above; the same production notes apply (one file per
 room, ports 51NN/52NN, full-suite gate 15/15).
 
+## Rooms XVI–XX — the five above
+
+Years after the true waking the house comes back for someone small asleep
+upstairs, and you are on M.'s side of every door. Kitchen (the hours; the
+fuses), Hall (I's corridor; the rehearsal), Sitting Room (the wireless; the
+child with the torch), the Stairs (the filing; XII's shaft with the roles
+swapped), the Room (XI set as she left it; the glass; the last light). Every
+layout, hour, puzzle, text and cue is in the spec above; the same
+production notes apply (one file per room, ports 51NN/52NN, full-suite gate
+20/20).
+
 ## Production notes
 
 - One file per room: `src/levels/LevelNN.js`, auto-discovered. Never
@@ -299,9 +341,11 @@ room, ports 51NN/52NN, full-suite gate 15/15).
 - Verify loop per room, per `LEVEL_API.md`: `npx vite build` →
   `node tools/screenshot.mjs N --port 51NN` (look at the four shots,
   iterate until composed and atmospheric) →
-  `node tools/playtest.mjs N --port 52NN` until SOLVED.
+  `node tools/playtest.mjs N --port 52NN` until SOLVED. For rooms XVI–XX
+  also screenshot the other two hours with `--hour morning` and
+  `--hour evening`.
 - Ports are per-room (51NN / 52NN) so rooms can be verified in
   parallel.
 - Phase gate: after each phase, the full suite (`npm run playtest`)
-  must pass 15/15 (or all-shipped/all-shipped) before the next phase
+  must pass 20/20 (or all-shipped/all-shipped) before the next phase
   begins.
