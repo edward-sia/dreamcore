@@ -17,7 +17,7 @@
 //   DATA_DIR=server/data      leaderboard.json lives here (mount a volume)
 //   STATIC_DIR=dist           built game to serve ('' disables static serving)
 //   ALLOWED_ORIGIN=*          CORS origin for /api (set your Pages URL to pin)
-//   MAX_LEVEL=10  MAX_ENTRIES=5000
+//   MAX_LEVEL=20  MAX_ENTRIES=5000
 //   TRUST_PROXY=1             use x-forwarded-for for rate limiting (PaaS)
 
 import http from 'node:http';
@@ -35,7 +35,7 @@ const STATIC_DIR = process.env.STATIC_DIR === ''
   ? null
   : path.resolve(ROOT, process.env.STATIC_DIR ?? 'dist');
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN ?? '*';
-const MAX_LEVEL = parseInt(process.env.MAX_LEVEL ?? '10', 10);
+const MAX_LEVEL = parseInt(process.env.MAX_LEVEL ?? '20', 10);
 const MAX_ENTRIES = parseInt(process.env.MAX_ENTRIES ?? '5000', 10);
 const TRUST_PROXY = (process.env.TRUST_PROXY ?? '1') === '1';
 

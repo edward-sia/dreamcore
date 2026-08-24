@@ -138,12 +138,12 @@ Environment:
 | `DATA_DIR` | `server/data` | where `leaderboard.json` lives |
 | `STATIC_DIR` | `dist` | built game to serve; `''` for API-only |
 | `ALLOWED_ORIGIN` | `*` | CORS origin for `/api` |
-| `MAX_LEVEL` | `10` | highest accepted room id |
+| `MAX_LEVEL` | `20` | highest accepted room id |
 | `MAX_ENTRIES` | `5000` | new players rejected beyond this |
 | `TRUST_PROXY` | `1` | rate-limit by `x-forwarded-for` |
 
 Notes on abuse: submissions are validated (name is stripped of control
-characters and capped at 24 chars, times must be 1s–24h, rooms 1–10) and
+characters and capped at 24 chars, times must be 1s–24h, rooms 1–20) and
 rate-limited per IP, but times are ultimately client-reported — this is an
 honor-system leaderboard for a cozy puzzle game, not an anti-cheat fortress.
 If an entry needs removing, delete its line from `leaderboard.json` and

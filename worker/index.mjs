@@ -36,7 +36,7 @@ function ensureSchema(env) {
 }
 
 const cfg = (env) => ({
-  maxLevel: parseInt(env.MAX_LEVEL ?? '10', 10),
+  maxLevel: parseInt(env.MAX_LEVEL ?? '20', 10),
   maxEntries: parseInt(env.MAX_ENTRIES ?? '5000', 10),
   origin: env.ALLOWED_ORIGIN ?? '*',
 });
