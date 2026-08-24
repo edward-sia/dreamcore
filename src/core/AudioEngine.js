@@ -19,6 +19,8 @@ const MOODS = {
   school:     { root: 49, chord: [1, 1.26, 1.5],          cutoff: 520, noise: 0.06, events: ['hum', 'hum', 'clock', 'rattle'] },
   playground: { root: 38, chord: [1, 1.498, 2.244, 3.0],  cutoff: 360, noise: 0.15, events: ['wind', 'wind', 'creak'] },
   under:      { root: 33, chord: [1, 1.189, 1.782],       cutoff: 260, noise: 0.09, events: ['drip', 'rumble', 'clock'] },
+  evening:    { root: 46, chord: [1, 1.498, 1.782, 2.0], cutoff: 560, noise: 0.06, events: ['clock', 'creak', 'hum'] },
+  morning:    { root: 58, chord: [1, 1.5, 2.0, 2.52],    cutoff: 900, noise: 0.18, events: ['birds', 'birds', 'creak'] },
 };
 
 export class AudioEngine {
@@ -301,6 +303,13 @@ export class AudioEngine {
         }
         break;
       }
+      case 'birds': {
+        for (let k = 0; k < 3; k++) {
+          const r = Math.random();
+          this._blip(out, 2600 + r * 900, 3400 + r * 600, 0.003, 0.06, 0.03, t + k * 0.09);
+        }
+        break;
+      }
       case 'clock': {
         this._blip(out, 1100, 900, 0.001, 0.04, 0.035);
         setTimeout(() => this._amb && this._blip(out, 950, 800, 0.001, 0.04, 0.03), 900);
@@ -391,7 +400,7 @@ export class AudioEngine {
 
   /**
    * A sustained positional source. Returns { stop(fade), setPosition(pos), setGain(g) }.
-   * kinds: tap radio boiler hum swing rain pianoKey
+   * kinds: tap radio boiler hum swing rain pianoKey birds idle fire simmer
    */
   loopAt(kind, position, opts = {}) {
     const noop = { stop() {}, setPosition() {}, setGain() {} };
@@ -405,6 +414,13 @@ export class AudioEngine {
     gain.connect(panner);
     const nodes = [], timers = [];
     const every = (ms, fn) => { fn(); timers.push(setInterval(fn, ms)); };
+    const randomly = (minMs, maxMs, fn) => {
+      const arm = () => {
+        const id = setTimeout(() => { if (stopped) return; fn(); arm(); }, minMs + Math.random() * (maxMs - minMs));
+        timers.push(id);
+      };
+      arm();
+    };
     const noise = (rate = 1) => { const s = this._noiseSource(rate); nodes.push(s); s.start(t, Math.random() * 2); return s; };
     const osc = (type, freq, detune = 0) => {
       const o = ctx.createOscillator(); o.type = type; o.frequency.value = freq; o.detune.value = detune;
@@ -415,6 +431,7 @@ export class AudioEngine {
     };
     const g = (v) => { const gg = ctx.createGain(); gg.gain.value = v; nodes.push(gg); return gg; };
     const lfoOn = (param, hz, depth) => { const l = osc('sine', hz); const lg = g(depth); l.connect(lg); lg.connect(param); };
+    let stopped = false;
 
     switch (kind) {
       case 'tap': {
@@ -454,10 +471,39 @@ export class AudioEngine {
         every((opts.every ?? 2.6) * 1000, () => this._piano(gain, freq, 0.05));
         break;
       }
+      case 'birds': {
+        randomly(500, 2200, () => {
+          for (let k = 0; k < 3; k++) {
+            const r = Math.random();
+            this._blip(gain, 2600 + r * 900, 3400 + r * 600, 0.003, 0.06, 0.04, ctx.currentTime + k * 0.09);
+          }
+        });
+        break;
+      }
+      case 'idle': {
+        const lp = filt('lowpass', 180); const gg = g(0.035);
+        osc('sawtooth', 37).connect(lp); lp.connect(gg); gg.connect(gain);
+        lfoOn(gg.gain, 3.8, 0.014);
+        const s = noise(); const nl = filt('lowpass', 300); const ng = g(0.01);
+        s.connect(nl); nl.connect(ng); ng.connect(gain);
+        break;
+      }
+      case 'fire': {
+        const s = noise(); const f = filt('lowpass', 700); const gg = g(0.045);
+        lfoOn(gg.gain, 0.6, 0.0135);
+        s.connect(f); f.connect(gg); gg.connect(gain);
+        randomly(150, 900, () => this._blip(gain, 1900, 1200, 0.001, 0.012, 0.05));
+        break;
+      }
+      case 'simmer': {
+        const s = noise(); const f = filt('bandpass', 2300, 0.8); const gg = g(0.02);
+        s.connect(f); f.connect(gg); gg.connect(gain);
+        randomly(200, 700, () => this._blip(gain, 520 + Math.random() * 400, 900, 0.002, 0.05, 0.03));
+        break;
+      }
       default: break;
     }
 
-    let stopped = false;
     return {
       stop: (fade = 0.6) => {
         if (stopped) return;
@@ -666,13 +712,45 @@ export class AudioEngine {
       case 'piano':
         this._piano(out, opts.freq ?? 261.63, opts.gain ?? 0.06);
         break;
+      case 'wind': {
+        const clicks = opts.clicks ?? 9, gap = opts.gap ?? 0.07;
+        for (let i = 0; i < clicks; i++) this._blip(out, 1500, 900, 0.002, 0.03, 0.05, t + i * gap);
+        this._blip(out, 300, 180, 0.004, 0.12, 0.06, t + clicks * gap);
+        break;
+      }
+      case 'smallStep': {
+        this._noiseBurst(out, 1400, 0.05, opts.soft ? 0.025 : 0.045, 'bandpass');
+        this._blip(out, 190, 120, 0.003, 0.07, opts.soft ? 0.03 : 0.05);
+        break;
+      }
+      case 'tick': this._blip(out, 2400, 1700, 0.001, 0.02, opts.gain ?? 0.05); break;
+      case 'gasp': {
+        const src = ctx.createBufferSource();
+        src.buffer = this._noiseBuf;
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass'; bp.Q.value = 1.5;
+        bp.frequency.setValueAtTime(600, t);
+        bp.frequency.linearRampToValueAtTime(1500, t + 0.3);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.06, t + 0.12);
+        g.gain.linearRampToValueAtTime(0, t + 0.37);
+        src.connect(bp); bp.connect(g); g.connect(out);
+        src.start(t, Math.random() * 2); src.stop(t + 0.45);
+        break;
+      }
+      case 'lock':
+        this._blip(out, 900, 500, 0.002, 0.05, 0.08);
+        this._blip(out, 220, 160, 0.004, 0.14, 0.12, t + 0.12);
+        break;
       case 'hummed': {
         const notes = opts.notes ?? [329.63, 392, 440, 392];
-        const step = opts.step ?? 0.55, gain = opts.gain ?? 0.03;
+        const small = !!opts.small;
+        const step = opts.step ?? 0.55, gain = (opts.gain ?? 0.03) * (small ? 0.7 : 1);
         notes.forEach((f, i) => {
           const w = t + i * step;
-          const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = f / 2;
-          const vib = ctx.createOscillator(); vib.frequency.value = 5.5;
+          const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = small ? f : f / 2;
+          const vib = ctx.createOscillator(); vib.frequency.value = small ? 6.5 : 5.5;
           const vg = ctx.createGain(); vg.gain.value = 6;
           vib.connect(vg); vg.connect(o.detune);
           const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900;
