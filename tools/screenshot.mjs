@@ -8,6 +8,7 @@ const args = process.argv.slice(2);
 const level = parseInt(args.find((a) => !a.startsWith('--')) ?? '1', 10);
 const port = parseInt(args.includes('--port') ? args[args.indexOf('--port') + 1] : '5199', 10);
 const out = args.includes('--out') ? args[args.indexOf('--out') + 1] : 'shots';
+const hour = args.includes('--hour') ? args[args.indexOf('--hour') + 1] : null;
 
 mkdirSync(out, { recursive: true });
 
@@ -15,6 +16,17 @@ const { page, errors, close, url } = await launch({ port });
 let failed = false;
 try {
   await loadLevel(page, url, level);
+
+  if (hour) {
+    const ok = await page.evaluate((h) => {
+      const hrs = window.__game.level?.hours;
+      if (!hrs) return false;
+      hrs.set(h);
+      return true;
+    }, hour);
+    if (!ok) throw new Error(`level ${level} has no hours (set --hour only on rooms XVI–XX)`);
+    await page.waitForTimeout(2500);          // the 1.6 s crossfade, then a beat
+  }
 
   const pad = String(level).padStart(2, '0');
   // spawn view, then look left / right / behind
@@ -31,9 +43,9 @@ try {
       p.pitch = 0;
     }, dyaw);
     await page.waitForTimeout(450);
-    await page.screenshot({ path: `${out}/level${pad}-${name}.png` });
+    await page.screenshot({ path: `${out}/level${pad}-${hour ? hour + '-' : ''}${name}.png` });
   }
-  console.log(`saved 4 screenshots to ${out}/level${pad}-*.png`);
+  console.log(`saved 4 screenshots to ${out}/level${pad}-${hour ? hour + '-' : ''}*.png`);
 } catch (e) {
   failed = true;
   console.error(`screenshot run failed: ${e.message}`);
