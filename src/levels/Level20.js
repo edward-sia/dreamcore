@@ -56,6 +56,7 @@ export default class Level20 extends LevelBase {
     this._answered = false; this._lightOn = true; this._lightStage = 0;
     this._holdStill = 0; this._breathT = 0; this._lyingDown = false;
     this._sheetHeld = false; this._boxOpen = false; this._noteTaken = false; this._glassSeen = false;
+    this._panelShut = false;
     this._doorBlocker = null; this._wbBlocker = null;
 
     this._mats();
@@ -337,13 +338,13 @@ export default class Level20 extends LevelBase {
     this._drawer.castShadow = true;
     this.add(this._drawer);
     const pull = new THREE.Mesh(new THREE.SphereGeometry(0.021, 10, 8), M.brass);
-    pull.position.set(1.3, 0.65, -0.4);
-    this._drawer.add(pull.clone());
-    pull.geometry.dispose();
-    // her note, half out of the drawer, at the evening
-    this._drawerNoteEvening = makeNoteProp({ tilt: 0.5 });
-    this._drawerNoteEvening.position.set(1.24, 0.66, -0.4);
-    this._drawerNoteEvening.rotation.z = 0.35;
+    pull.position.set(-0.028, 0, 0);                       // local to the drawer front
+    this._drawer.add(pull);
+    // her note, caught in the drawer's mouth at the evening: _onHour stands the
+    // front ajar and the paper lies across its top edge, the rest of it inside.
+    this._drawerNoteEvening = makeNoteProp({ tilt: 0.35 });
+    this._drawerNoteEvening.position.set(1.31, 0.719, -0.4);
+    this._drawerNoteEvening.rotation.z = -0.05;
     this.add(this._drawerNoteEvening);
 
     // the lamp — the room's warm light at the evening
@@ -829,6 +830,7 @@ export default class Level20 extends LevelBase {
     const showNote = hour === 'morning' && this._boxOpen && !this._noteTaken;
     this._noteInBox.visible = showNote;
     this.game.interaction.setEnabled(this._noteInBox, showNote);
+    this._drawer.position.x = hour === 'evening' ? 1.25 : 1.325;   // ajar, with her note in it
     this._lampFilament.material.emissiveIntensity = hour === 'evening' ? 2.6 : 0.05;
     this._sun.castShadow = hour === 'morning';
     const sky = { night: [0x2a2e44, 0x07070a], evening: [0x5a4a3a, 0x1a1410], morning: [0xffffff, 0xcfcac0] }[hour];
@@ -857,16 +859,17 @@ export default class Level20 extends LevelBase {
     if (this.hours.is('night')) {
       const ok = this._done.chair && this._done.sheet && this._done.wound && this._done.note;
       if (!ok) {
-        // The first touch is the discovery, and _advance says so; the nudge
-        // would only overwrite it in the same breath. It still counts, so the
-        // second wrong flip says where to look, as the spec asks.
         this._clockWrong++;
+        const [nudge, secs] = this._clockWrong >= 2
+          ? ['Half past eight shows you how she left it.', 5]
+          : ['Not yet. It isn\'t how she left it.', 4];
         if (this._wound) {
           this.playSound('tick');
-          this.subtitle(
-            this._clockWrong >= 2 ? 'Half past eight shows you how she left it.' : 'Not yet. It isn\'t how she left it.',
-            this._clockWrong >= 2 ? 5 : 4,
-          );
+          this.subtitle(nudge, secs);
+        } else {
+          // The first touch is the discovery too, and _advance says so in the
+          // same breath: let the nudge land after that line instead of under it.
+          this.after(5.2, () => this.subtitle(nudge, secs));
         }
         this._advance();                                   // it still flips: you may need the other hours
         return;
@@ -901,7 +904,13 @@ export default class Level20 extends LevelBase {
     const pl = this.game.player;
 
     // ---- the way in ----
-    this.interact(this._backPanel, { prompt: 'through', once: true, onInteract: () => {
+    this.interact(this._backPanel, { prompt: 'through', onInteract: () => {
+      if (this._panelShut) {                                 // it shut behind you: the convention's line
+        this.playSound('locked');
+        this.subtitle('It shut behind you. They always do.', 4);
+        return;
+      }
+      this.game.interaction.setEnabled(this._backPanel, false);   // nothing to say while it stands open
       this._backPanel.setOpen(true, 1);
       if (this._wbBlocker) { this.removeBlocker(this._wbBlocker); this._wbBlocker = null; }
       this.playSound('door');
@@ -918,6 +927,9 @@ export default class Level20 extends LevelBase {
         if (unseen < 0.4) return;
         shut();
         this._backPanel.setOpen(false);
+        this._panelShut = true;
+        this.game.interaction.setPrompt(this._backPanel, 'the way you came');
+        this.game.interaction.setEnabled(this._backPanel, true);
         this.playSoundAt('door', { x: -0.55, y: 1, z: 1.79 });
         this._wbBlocker = this.addBlocker([-1.0, 0, 1.7], [-0.1, 2.2, 1.9]);
       });
@@ -989,6 +1001,19 @@ export default class Level20 extends LevelBase {
         this.cue('a music box', new THREE.Vector3(1.5, 1.6, -0.5));
       });
     } });
+    // hers, at the evening: it is already wound, and it plays faintly whenever
+    // nobody is looking at it. Its own ticker, not whenUnseen: that one arms
+    // once and would spend the arming at an hour where this says nothing.
+    let boxUnseen = 0, sinceBox = 99;
+    this.tick((dt) => {
+      sinceBox += dt;
+      if (!this.hours.is('evening') || this.isSeen(this._musicBox)) { boxUnseen = 0; return; }
+      boxUnseen += dt;
+      if (boxUnseen < 1.5 || sinceBox < 9) return;           // once every nine seconds, not every glance away
+      boxUnseen = 0; sinceBox = 0;
+      this.playSoundAt('musicbox', { x: 1.5, y: 1.6, z: -0.5 }, { notes: HUM4, gain: 0.022, slow: 0.2, holdSeconds: 6 });
+      this.cue('a music box, faintly', new THREE.Vector3(1.5, 1.6, -0.5));
+    });
     this.interact(this._drawer, { prompt: 'the drawer', onInteract: () => {
       if (!this.hours.is('night')) { this.subtitle('Hers. Leave it.', 3); return; }
       if (this._done.note) { this.subtitle('The note is in it, older than the others.', 3); return; }
@@ -1017,7 +1042,11 @@ export default class Level20 extends LevelBase {
 
     // ---- the sleeper and the stir ----
     this.tick((dt) => {
-      if (!this.hours.is('night') || this._waking || this._out) { this._stirNeed = 0; return; }
+      // Once the clock has stopped the hours are locked, so a stir still
+      // pending then must not become a wake: _wake forces the evening, and the
+      // stopped clock would repaint itself 8:30 in the same breath as 'it will
+      // be 3:07 for as long as anyone remembers'.
+      if (!this.hours.is('night') || this._waking || this._out || this._clockStopped) { this._stirNeed = 0; return; }
       const v = Math.hypot(pl.velocity.x, pl.velocity.z);
       this._stir = Math.max(0, this._stir - dt / 10);
       if (this._stirNeed > 0) {
@@ -1146,6 +1175,13 @@ export default class Level20 extends LevelBase {
         this._lightStage = 2;
       }
     } });
+    // The interaction raycast has no occluders, so from the east half of the
+    // bedroom her door wins the crosshair through two walls. Offer it only when
+    // you are out of the room, where it is a door you can actually see.
+    this.tick(() => {
+      const p = pl.position;
+      this.game.interaction.setEnabled(this._herDoor, !(p.z < 1.75 && p.x < 2.1));
+    });
     this.interact(this._herDoor, { prompt: 'her door', onInteract: () => {
       if (this.hours.is('morning')) { this.subtitle('White. The house is gone from here on.', 5); return; }
       if (this.hours.is('evening')) { this.playSound('locked'); this.subtitle('Not yet. She is still up.', 4); return; }
@@ -1186,6 +1222,7 @@ export default class Level20 extends LevelBase {
   }
 
   _wake() {
+    if (this._clockStopped) { this._stirNeed = 0; this._stir = 0; return; }   // the hours are locked at 3:07
     this._waking = true; this._stirNeed = 0; this._stir = 0; this._wakes++;
     this.playSoundAt('hummed', { x: -1.55, y: 0.7, z: -0.6 }, { notes: [LevelBase.NOTES.E], small: true });
     this.subtitle('It sits up. It is awake, and the hour is wrong, and you are not here yet.'
