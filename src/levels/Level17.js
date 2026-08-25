@@ -675,7 +675,10 @@ export default class Level17 extends LevelBase {
   // ---------- the shared helpers of the five above ----------
 
   _wind() {
-    if (this._clockLocked || this.hours.changing) return;
+    if (this.hours.changing) return;
+    // The hands are done: the door at the end is only there at 3:07, so the
+    // clock says why it will not turn instead of answering with nothing.
+    if (this._clockLocked) { this.subtitle('Let it be 3:07. The door at the end is only open at this hour.', 4); return; }
     // Not while something is walking the hall: another hour takes the corridor
     // away under it, and the door it opens is only there at 3:07.
     if (this._rehearsing || this._walking) { this.subtitle('Not now. Something small is out in the hall.', 4); return; }
@@ -824,9 +827,16 @@ export default class Level17 extends LevelBase {
         : { note: this._noteOnPedestal, key: this._keyOnPedestal };
       if (this.hasItem('note-i') && this._placed.note === null) { this.removeItem('note-i'); slots.note.visible = true; this._placed.note = where; this.playSound('paper'); return; }
       if (this.hasItem('spare-key') && this._placed.key === null) { this.removeItem('spare-key'); slots.key.visible = true; this._placed.key = where; this.playSound('pickup'); return; }
-      // take back
-      if (this._placed.note === where) { slots.note.visible = false; this._placed.note = null; this.giveItem({ id: 'note-i', name: 'a note, folded small' }); return; }
-      if (this._placed.key === where) { slots.key.visible = false; this._placed.key = null; this.giveItem({ id: 'spare-key', name: 'the spare key, warm' }); return; }
+      // Take back everything this surface holds, in one press. One at a time
+      // strands the key: with the note and the key both down and empty hands,
+      // the press that lifts the note is undone by the next one putting it
+      // straight back, and the key under it never comes up.
+      const tookNote = this._placed.note === where;
+      const tookKey = this._placed.key === where;
+      if (tookNote) { slots.note.visible = false; this._placed.note = null; this.giveItem({ id: 'note-i', name: 'a note, folded small' }); }
+      if (tookKey) { slots.key.visible = false; this._placed.key = null; this.giveItem({ id: 'spare-key', name: 'the spare key, warm' }); }
+      if (tookNote && tookKey) { this.subtitle('You take them both back.', 3); return; }
+      if (tookNote || tookKey) return;
       this.subtitle(where === 'table' ? 'The table by the door. Nothing on it.' : 'Where the flowers used to be. Five dry stems.', 4);
     };
     this.interact(this._table, { prompt: 'the table', onInteract: () => place('table') });
