@@ -52,6 +52,7 @@ const BOX_LINES = {
   'the field': 'A rusted tin, empty.', 'the theater': 'A ticket stub, row F.',
   'the platform': 'A ticket for the 23:47, smudged.', 'the supermarket': 'A list. You know the list.',
 };
+const HUM = LevelBase.tune('EGAG');                           // hers, from downstairs, at the evening
 const FIRE_PLAN = 'IN THE EVENT OF FIRE\ndo not use the lifts\ndo not run\nassembly point: the playground';
 const GRADE = { vignette: 1.3, grain: 0.038, desat: 0.2, lift: 0.02, fringe: 0.0007 };
 
@@ -455,7 +456,11 @@ export default class Level19 extends LevelBase {
     this.add(bulb); s.objects.push(bulb);
     s.lights.push({ light: bulb.light, intensity: 2.2 });
     this._dimmable.push(bulb.light);
-    s.loops.push({ kind: 'tap', position: { x: -3.3, y: LAND_Y + 0.6, z: -2.2 }, opts: {} });
+    // the tap is quiet — 0.15, under the boiler and the wireless — and the
+    // hours' own loop table has nowhere to put a gain, so it is run by hand
+    const tapPos = { x: -3.3, y: LAND_Y + 0.6, z: -2.2 };
+    s.onEnter = () => { this._tapLoop = this.loopAt('tap', tapPos); this._tapLoop.setGain(0.15); };
+    s.onLeave = () => { this._tapLoop?.stop(0.6); this._tapLoop = null; };
 
     this._pack(s, from, 'evening', 'bath', [-3.7, -1.2, -2.7, -0.3]);
     this.hours.bind('evening', s);
@@ -1172,9 +1177,13 @@ export default class Level19 extends LevelBase {
       }
       this.game.interaction.setEnabled(this._keyArch, hour === 'morning' && this._keyArch.visible);
       this.game.interaction.setEnabled(this._photoArch, hour === 'morning' && this._photoArch.visible);
-      if (hour === 'night' && !this._inShaft && !this._approach) {
+      // the hour that just arrived says what to do with it — from the first
+      // wind on, which is the one that opens the landing's other two rooms
+      if (!this._inShaft && !this._approach) {
+        const carrying = this.hasItem('photo') || this.hasItem('ribbon') || this.hasItem('spare-key');
         this.setObjective(this._ready ? 'down, two flights below'
-          : this._wound ? 'the landing, at another hour' : 'up. then yours last.');
+          : carrying ? 'the box, in the box room'
+            : this._wound ? 'the landing, at another hour' : 'up. then yours last.');
       }
     };
 
@@ -1186,6 +1195,16 @@ export default class Level19 extends LevelBase {
         this.playSoundAt('knock', at, { count: 2, soft: true });
         this.cue('two knocks, behind the door', new THREE.Vector3(at.x, at.y, at.z));
       }
+    });
+
+    this.tick((dt) => {                                 // her humming from below, once a minute, at the evening
+      if (!this.hours.is('evening')) { this._humT = 52; return; }
+      this._humT = (this._humT ?? 52) + dt;
+      if (this._humT < 60) return;
+      this._humT = 0;
+      const at = { x: 0, y: 0.5, z: 6 };
+      this.playSoundAt('hummed', at, { notes: HUM });
+      this.cue('humming, from below', new THREE.Vector3(at.x, at.y, at.z));
     });
 
     // ---- the bathroom ----
@@ -1372,7 +1391,7 @@ export default class Level19 extends LevelBase {
           this.subtitle('You write it, in an adult hand. It is the only hand it could have been in.', 6);
           this.game.interaction.setPrompt(this._chalkPlane, 'the chalk');
           this.setObjective('wait for me');
-        } else if (this._loopCount > this._tally - 1) {
+        } else if (this._loopCount > this._tally) {         // a stroke per round, and no more
           this._tally++;
           this._redrawChalk();
           this.playSound('clue');
@@ -1436,14 +1455,18 @@ export default class Level19 extends LevelBase {
 
   /** One stub light must be on, and it must be the one the dream sees this time. */
   _loopCheck() {
-    const k = this._loopCount - 1;
     const lit = [3, 4, 5].filter((f) => this._stub[f].on);
-    const want = k === 0 ? 5 : k === 1 ? 4 : 3;
+    // One door closer than the last one it saw — counted off the doors it has
+    // already seen, not off the rounds. The first walk down is a round with
+    // nothing lit, and the room has to survive it: a wrong round costs the
+    // round, never the way out.
+    const seen = Math.min(this._correct, 2);
+    const want = seen === 0 ? 5 : seen === 1 ? 4 : 3;
     const right = lit.length === 1 && lit[0] === want;
     const wpos = this._wMesh.position.clone().add(new THREE.Vector3(0, 0.9, 0));
     // the hum and the hurry are the whole answer to the light rule, so each
     // gets a caption and a line as well as the sound
-    if (right && k < 2) {
+    if (right && this._correct < 2) {
       this._correct++;
       this.playSoundAt('hummed', wpos, { notes: LevelBase.tune('EG'), small: true });
       this.cue('it hums', wpos);
@@ -1588,14 +1611,36 @@ export default class Level19 extends LevelBase {
   }
 
 
+  /**
+   * Wind the clock on to `to`, through the clock's own handler. The crossfade
+   * runs on the engine's clamped step and a headless render sits far below
+   * real time, so hurry the hour along — the handlers stay real, and the
+   * beats that matter (the stillness, the child) are measured off `t`, which
+   * the time scale does not touch. XVII's _windTo does the same.
+   */
+  async _windTo(to) {
+    await this._waitFor(() => !this.hours.changing, 10);
+    this.debugInteract(this._clockBody);
+    this.game.engine.timeScale = 12;
+    await this._waitFor(() => this.hours.is(to) && !this.hours.changing, 12);
+    this.game.engine.timeScale = 1;
+  }
+
   async debugSolve() {
     const pl = this.game.player;
     const t = (x, z, yaw, y) => pl.teleport(x, z, yaw, y);
+    try {
+      await this._solve(t);
+    } finally {
+      this.game.engine.timeScale = 1;
+    }
+  }
+
+  async _solve(t) {
     t(0, 0.5, 0, LAND_Y);
 
     // the morning: the archive, six cards filed, the key and the photograph
-    this.debugInteract(this._clockBody);
-    await this._waitFor(() => this.hours.is('morning') && !this.hours.changing, 18);
+    await this._windTo('morning');
     this.debugInteract(this._airDoor);
     await this.debugWait(0.25);
     for (let k = 0; k < 6; k++) {
@@ -1611,8 +1656,7 @@ export default class Level19 extends LevelBase {
     await this.debugWait(0.12);
 
     // the evening: the ribbon, the label crossed out twice, the box filled
-    this.debugInteract(this._clockBody);
-    await this._waitFor(() => this.hours.is('evening') && !this.hours.changing, 18);
+    await this._windTo('evening');
     this.debugInteract(this._bathDoor);
     await this.debugWait(0.25);
     this.debugInteract(this._ribbon);
@@ -1626,8 +1670,7 @@ export default class Level19 extends LevelBase {
     for (let i = 0; i < 3; i++) { this.debugInteract(this._theBox); await this.debugWait(0.12); }
 
     // 3:07: the shaft
-    this.debugInteract(this._clockBody);
-    await this._waitFor(() => this.hours.is('night') && !this.hours.changing, 18);
+    await this._windTo('night');
     this.debugInteract(this._airDoor);
     await this.debugWait(0.25);
     t(MAIN_CX, 0.25, Math.PI / 2, LANDINGS[3][1]);                       // L3; W appears a floor above
