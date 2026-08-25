@@ -955,6 +955,7 @@ export default class Level16 extends LevelBase {
   }
 
   _enterEvening() {
+    this._paintPlates(true);
     this._visitedEvening = true;
     this._eveningRadio = this.loopAt('radio', { x: 0.3, y: 1.2, z: -3.2 });
     this._eveningRadio.setGain(0.5);                       // faint, through the hatch
@@ -980,6 +981,7 @@ export default class Level16 extends LevelBase {
   }
 
   _enterNight() {
+    this._paintPlates(false);
     if (this._visitedEvening && !this._tapPlayedAtNight) {
       this._tapPlayedAtNight = true;
       this._tap = this.loopAt('tap', this._tapPos);
@@ -1055,6 +1057,16 @@ export default class Level16 extends LevelBase {
         this.cue('a music box, upstairs', new THREE.Vector3(OVERHEAD_MUSIC.x, OVERHEAD_MUSIC.y, OVERHEAD_MUSIC.z));
         note('a music box, upstairs. your room.');
       } else { clearTimeout(this._timers.yours); this._timers.yours = null; this._crackGlow.visible = false; }
+    }
+  }
+
+  // Her evening is hours before 3:07, so nothing you write at night is on the
+  // box yet: the plates are there and blank, as the spec's evening column says.
+  _paintPlates(blank) {
+    for (let i = 0; i < this._plateMats.length; i++) {
+      this._plateMats[i].map?.dispose();
+      this._plateMats[i].map = this._plateTexture(blank ? '' : LABELS[this._plate[i]]);
+      this._plateMats[i].needsUpdate = true;
     }
   }
 
