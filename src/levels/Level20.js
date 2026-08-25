@@ -56,7 +56,7 @@ export default class Level20 extends LevelBase {
     this._answered = false; this._lightOn = true; this._lightStage = 0;
     this._holdStill = 0; this._breathT = 0; this._lyingDown = false;
     this._sheetHeld = false; this._boxOpen = false; this._noteTaken = false; this._glassSeen = false;
-    this._panelShut = false;
+    this._panelShut = false; this._saidWhite = false;
     this._doorBlocker = null; this._wbBlocker = null;
 
     this._mats();
@@ -840,6 +840,8 @@ export default class Level20 extends LevelBase {
     this._setClock({ night: '3:07', morning: '7:15', evening: '8:30' }[hour]);
   }
 
+  _white() { this.subtitle('White. The house is gone from here on.', 5); }
+
   _wrongHourPlacing() {
     if (this.hours.is('evening')) this.subtitle('She\'d only tidy it away. Leave it for the night.', 5);
     else this.subtitle('There is nothing here to leave it on, not any more.', 5);
@@ -1063,10 +1065,15 @@ export default class Level20 extends LevelBase {
     });
 
     // ---- the door follows the hour until the clock has stopped ----
+    // It shuts only when you are inside the bedroom. z alone is not that test:
+    // the landing's east leg and her room are at z < 1.7 as well, so flipping
+    // the clock to night from the corridor (the lit clock is a target through
+    // the open door) and then walking east used to shut and block the door
+    // with you outside it — sealed out of the room that holds the clock.
     this.tick(() => {
       if (this._clockStopped || this._waking || this._doorOpen || this._doorShut) return;
       if (!this.hours.is('night')) { this._door.setOpen(true, -1); this._setDoorway(true); }
-      else if (pl.position.z < 1.7) { this._door.setOpen(false); this._setDoorway(false); }
+      else if (pl.position.z < 1.7 && pl.position.x < 2.1) { this._door.setOpen(false); this._setDoorway(false); }
     });
 
     // ---- the door, out, the lock ----
@@ -1182,8 +1189,23 @@ export default class Level20 extends LevelBase {
       const p = pl.position;
       this.game.interaction.setEnabled(this._herDoor, !(p.z < 1.75 && p.x < 2.1));
     });
+    // At the morning her door stands open onto white behind a blocker, and it
+    // is stepping to it that says so — once per visit (§5 conventions), not
+    // once per press.
+    this.tick(() => {
+      if (!this.hours.is('morning')) { this._saidWhite = false; return; }
+      const p = pl.position;
+      if (p.x > 2.7 && p.z > -1.9 && p.z < -0.2) {
+        if (!this._saidWhite) { this._saidWhite = true; this._white(); }
+      } else if (p.x < 2.5 || p.z > 0.2) {
+        this._saidWhite = false;
+      }
+    });
     this.interact(this._herDoor, { prompt: 'her door', onInteract: () => {
-      if (this.hours.is('morning')) { this.subtitle('White. The house is gone from here on.', 5); return; }
+      if (this.hours.is('morning')) {
+        if (!this._saidWhite) { this._saidWhite = true; this._white(); }
+        return;
+      }
       if (this.hours.is('evening')) { this.playSound('locked'); this.subtitle('Not yet. She is still up.', 4); return; }
       if (this._lightStage < 2 || !this._lightOn) {
         this.playSound('locked');
@@ -1205,7 +1227,7 @@ export default class Level20 extends LevelBase {
       if (!this._lightOn) { this.subtitle('Not in the dark. Not for them.', 4); return; }
       this._lyingDown = true;
       this.subtitle('You lie down, the way she did, and the light stays on.', 4);
-      this.after(1.6, () => this.complete());
+      this.after(2.2, () => this.complete());
     } });
   }
 
