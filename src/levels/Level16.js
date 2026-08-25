@@ -75,6 +75,8 @@ export default class Level16 extends LevelBase {
     this._visitedEvening = false;
     this._tapPlayedAtNight = false;
     this._hummedOnce = false;
+    this._chairOut = false;
+    this._chairSaid = false;
     this._overheadArmed = false;
     this._wasChanging = false;
 
@@ -709,6 +711,11 @@ export default class Level16 extends LevelBase {
     // her plates are the morning's; yours are the ones you can write on
     this.hours.bind('night', { objects: this._plates, interact: this._plates });
     this.hours.bind('evening', { objects: this._plates, interact: this._plates });
+    // the levers stay on the wall at every hour but are only yours to flip at
+    // night and hers to put back at the evening; the morning's fuse box is her
+    // plates and nothing else (spec §5.1, the fuse box row)
+    this.hours.bind('night', { interact: this._switches });
+    this.hours.bind('evening', { interact: this._switches });
     // the morning: her labels, each under its own switch; the 3rd and 5th fell off
     this._herPlates = new THREE.Group();
     const gone = new THREE.MeshStandardMaterial({ color: 0x74777b, roughness: 0.7, metalness: 0.3 });
@@ -801,13 +808,17 @@ export default class Level16 extends LevelBase {
           this._cupKey.visible = false;
           this.giveItem({ id: 'little-key', name: 'the little key' });
           this.subtitle('A cup with no handle. In it, the little key for the door at the top of the stairs. She keeps it here. You take it.', 6);
-        } else if (this.hours.is('morning')) {
-          this.subtitle('The dresser is bare. The cup went in a box, or a bin.', 4);
         } else {
           this.subtitle('A cup with no handle. Empty.', 4);
         }
       },
     });
+    // the cup is gone at the morning, so its morning line is the dresser's
+    this.interact(this._dresser, {
+      prompt: 'the dresser',
+      onInteract: () => this.subtitle('The dresser is bare. The cup went in a box, or a bin.', 4),
+    });
+    this.hours.bind('morning', { interact: [this._dresser] });
     this.interact(this._calendar, {
       prompt: 'the calendar',
       onInteract: () => this.subtitle(this.hours.is('morning')
@@ -843,7 +854,7 @@ export default class Level16 extends LevelBase {
     this.interact(this._range, {
       prompt: 'the range',
       onInteract: () => {
-        if (!this.hours.is('night')) { this.subtitle(this.hours.is('evening') ? 'Supper. Still warm. She has just turned it down.' : 'Gone. A paler rectangle on the wall where it stood.', 4); return; }
+        if (!this.hours.is('night')) { this.subtitle('Supper. Still warm. She has just turned it down.', 4); return; }
         if (this.hasItem('pan')) {
           this.removeItem('pan');
           this._panRange.visible = true;
@@ -854,6 +865,12 @@ export default class Level16 extends LevelBase {
           this.subtitle(this._panOnRange ? 'The pan, back where it was.' : 'Cold. She washed up. She always washed up.', 4);
         }
       },
+    });
+
+    // the range is gone at the morning; what it left behind carries its line
+    this.interact(this._paleRect, {
+      prompt: 'the range',
+      onInteract: () => this.subtitle('Gone. A paler rectangle on the wall where it stood.', 4),
     });
 
     // ---- the table: the little key ----
@@ -867,11 +884,26 @@ export default class Level16 extends LevelBase {
         this._keyPlaced = true;
         this.playSound('pickup');
         this.subtitle('You put it down where small hands can find it. It will be warm for a while.', 5);
-        this.whenUnseen(this._chairSouthN, () => {
+        // the chair only moves, and is only spoken of, at the hour it stands
+        // there: isSeen/isUnseen do not know it is hidden at the other two
+        let unseenOff = null, seenOff = null;
+        const sayChair = () => {
+          if (this._chairSaid) { seenOff?.(); return; }
+          if (!this.hours.is('night')) return;
+          this._chairSaid = true;
+          this.subtitle('The chair is out again. Somebody sat down to supper.', 5);
+          seenOff?.();
+        };
+        const slideChair = () => {
+          if (this._chairOut) { unseenOff?.(); return; }
+          if (!this.hours.is('night') || this.hours.changing) return;
+          this._chairOut = true;
+          unseenOff?.();
           this._chairSouthN.position.z += 0.3;
           this.playSoundAt('door', { x: 0, y: 0.5, z: 1.0 }, { soft: true });
-          this.whenSeen(this._chairSouthN, () => this.subtitle('The chair is out again. Somebody sat down to supper.', 5));
-        });
+          seenOff = this.whenSeen(this._chairSouthN, sayChair, { once: false });
+        };
+        unseenOff = this.whenUnseen(this._chairSouthN, slideChair, { once: false });
       },
     });
 
