@@ -323,7 +323,7 @@ Stairwell (the loop; stand still), School (the plates lie; play the
 tune), Playground (hide so it can come), Under the House (the evening
 order by ear; the box; the meeting). Every layout, puzzle, text and cue
 is in the spec above; the same production notes apply (one file per
-room, ports 51NN/52NN, full-suite gate 15/15).
+room, ports 51NN/52NN, full-suite gate 20/20).
 
 ## Rooms XVI–XX — the five above
 

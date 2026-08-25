@@ -857,7 +857,8 @@ export default class Level20 extends LevelBase {
   // ---------- the hours, by hand, at the clock ----------
 
   _flip() {
-    if (this._clockStopped || this.hours.changing || this._waking) return;
+    if (this._clockStopped) { this.subtitle('3:07. It will be 3:07 for as long as anyone remembers.', 4); return; }
+    if (this.hours.changing || this._waking) return;
     if (this.hours.is('night')) {
       const ok = this._done.chair && this._done.sheet && this._done.wound && this._done.note;
       if (!ok) {

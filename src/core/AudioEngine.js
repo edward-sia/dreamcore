@@ -520,7 +520,19 @@ export class AudioEngine {
         }, fade * 1000 + 100);
       },
       setPosition: (pos) => this._setPannerPos(panner, pos),
-      setGain: (v) => gain.gain.setTargetAtTime(v, ctx.currentTime, 0.1),
+      setGain: (v) => {
+        // The 0.8 s fade-in above is a scheduled ramp; a setTargetAtTime issued
+        // under it is simply overridden, so rooms that set their volume on the
+        // line after loopAt() got full gain. Hold the ramp where it is first.
+        const now = ctx.currentTime;
+        if (gain.gain.cancelAndHoldAtTime) gain.gain.cancelAndHoldAtTime(now);
+        else {
+          const held = gain.gain.value;
+          gain.gain.cancelScheduledValues(now);
+          gain.gain.setValueAtTime(held, now);
+        }
+        gain.gain.setTargetAtTime(v, now, 0.1);
+      },
     };
   }
 

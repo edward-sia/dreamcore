@@ -657,7 +657,8 @@ export default class Level18 extends LevelBase {
   // ---------- the hours, by hand, at the clock ----------
 
   _wind() {
-    if (this._clockLocked || this.hours.changing) return;
+    if (this._clockLocked) { this.subtitle('The clock has done what it was for.', 3); return; }
+    if (this.hours.changing) return;
     this.playSoundAt('wind', CLOCK_POS);
     const next = this.hours.order[(this.hours.order.indexOf(this.hours.current) + 1) % 3];
     const [h, m] = { night: [3, 7], morning: [7, 15], evening: [8, 30] }[next];

@@ -801,7 +801,7 @@ export default class Level17 extends LevelBase {
     this.interact(this._stairs, { prompt: 'the stairs', onInteract: () => this.subtitle(this.hours.is('evening') ? 'Not yet. The wireless first. Then up.' : 'The banister is wrapped. The carpet is rolled.', 4) });
     this.interact(this._cupboardDoor, { prompt: 'the cupboard', onInteract: () => { this.playSound('locked'); this.subtitle('Locked. Coats and a hoover and the smell of the dark.', 4); } });
     this.interact(this._phone, { prompt: 'the telephone', onInteract: () => this.subtitle('The dialling tone. Nobody to ring, at this hour.', 4) });
-    this.interact(this._stand, { prompt: 'the sunflowers', onInteract: () => this.subtitle('Sunflowers, five of them. They have stood on this spot every Friday of your life.', 5) });
+    this.interact(this._stand, { prompt: 'the sunflowers', onInteract: () => this.subtitle('Sunflowers, five of them. They have stood on this spot every Sunday of your life.', 5) });
     let fl = 0;
     this._dreamDoors.forEach((door) => this.interact(door, { prompt: 'try the door', onInteract: () => {
       this.playSound('locked');
