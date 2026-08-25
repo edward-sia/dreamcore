@@ -739,6 +739,11 @@ export default class Level18 extends LevelBase {
 
     // ---- the wireless: one digit per touch ----
     this.interact(this._wireless, { prompt: 'the wireless', onInteract: () => {
+      // the hands are still moving: the room is between hours and is neither
+      // of them yet, so the dial answers no one — the clock refuses itself the
+      // same way. A digit landing in here would tune a room on its way out of
+      // 3:07, and the swap would take the child away mid-tune.
+      if (this.hours.changing) return;
       if (!this.hours.is('night')) { this.subtitle('On the station. The needle rests where it always rests.', 4); return; }
       if (this._tuned) { this.subtitle('On the station. Low. Leave it.', 3); return; }
       const shown = STATION.split('').map((_, i) => this._digits[i] ?? '·').join(' ');
@@ -751,6 +756,10 @@ export default class Level18 extends LevelBase {
   }
 
   _click(d) {
+    // 3:07 only, and only once the hour has settled: a digit that lands inside
+    // the crossfade would set the tune going in a room about to be swapped out
+    // from under it. Refuse it whole; the digits so far keep their place.
+    if (!this.hours.is('night') || this.hours.changing) return;
     this.playSoundAt('tick', WIRELESS, { gain: 0.08 });
     this.cue('a click, at the wireless', new THREE.Vector3(WIRELESS.x, WIRELESS.y, WIRELESS.z));
     this._digits += d;
@@ -766,6 +775,7 @@ export default class Level18 extends LevelBase {
   }
 
   _soundEvent(name) {
+    if (this.hours.changing) return;                        // between hours nothing you touch answers
     const now = performance.now() / 1000;
     if ((this._cooldown[name] ?? 0) > now) return;
     this._cooldown[name] = now + 8;
@@ -849,8 +859,28 @@ export default class Level18 extends LevelBase {
     const dx = p.position.x - m.position.x, dz = p.position.z - m.position.z;
     const d = Math.hypot(dx, dz);
     if (d >= KEEP) return;
-    if (d < 1e-3) { p.teleport(m.position.x + KEEP, m.position.z); return; }
-    p.teleport(m.position.x + dx * (KEEP / d), m.position.z + dz * (KEEP / d));
+    const ux = d < 1e-3 ? 1 : dx / d, uz = d < 1e-3 ? 0 : dz / d;
+    // teleport writes the position straight through, with none of the walls
+    // and none of the room's bounds a step gets. So walk the correction back
+    // along its own line until it lands somewhere a step could have taken you:
+    // out to the two metres where there is room, and short of them where there
+    // is not. It is still a wall you walk into, never a way through one.
+    for (let t = KEEP; t > d + 0.01; t -= 0.15) {
+      const x = m.position.x + ux * t, z = m.position.z + uz * t;
+      if (this._standable(x, z)) { p.teleport(x, z); return; }
+    }
+  }
+
+  /** Is there room for you at (x, z) — the walls and the furniture as a step meets them? */
+  _standable(x, z) {
+    const b = this.bounds;
+    if (x < b.min.x || x > b.max.x || z < b.min.z || z > b.max.z) return false;
+    for (const s of this.solids) {
+      if (s === this._childBox) continue;                   // its body is the thing we are leaving
+      if (s.max.y < 0.55 || s.min.y > 1.8) continue;        // stepped over, or walked under
+      if (x > s.min.x - 0.34 && x < s.max.x + 0.34 && z > s.min.z - 0.34 && z < s.max.z + 0.34) return false;
+    }
+    return true;
   }
 
   _updateChild(dt) {
