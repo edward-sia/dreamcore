@@ -270,6 +270,16 @@ export default class Level17 extends LevelBase {
     this.track(this._frontDoor);
     this._at(EM, this._frontDoor, { touch: true });
 
+    // the hall's own light, falling out of the doorway while the door stands
+    // open. The porch light is dead and the lamp post refuses, so without this
+    // wedge the porch, the gate and the mailbox are a black rectangle with
+    // prompts floating in it. It reaches the gate and no further: past that the
+    // street is still another night.
+    this._doorSpill = new THREE.SpotLight(0xffd2a0, 0, 6.5, 0.95, 0.85, 1.5);
+    this._doorSpill.position.set(0, 2.1, -5.32);
+    this._doorSpill.target.position.set(0, 0, -6.9);
+    this.add(this._doorSpill, this._doorSpill.target);
+
     const porchMat = makeMat('wood', { base: '#5b4a38', repeat: [2, 1] });
     this._at(['evening'], this._plane(3.0, 1.6, porchMat, 0, 0.02, -6.2, 'up'));
     const asphalt = makeMat('asphalt', { base: '#2b2b2e', repeat: [8, 8] });
@@ -759,6 +769,7 @@ export default class Level17 extends LevelBase {
         this._frontDoor.setOpen(true, -1);
         if (this._frontBlocker) { this.removeBlocker(this._frontBlocker); this._frontBlocker = null; }
         this.playSound('door');
+        this._doorSpill.intensity = 7;
         this.subtitle('The porch, and the street, and another night going on out there without her.', 5);
       } else {
         this.subtitle('White. The house is gone from here on.', 4);
@@ -768,11 +779,13 @@ export default class Level17 extends LevelBase {
     this.hours.bind('evening', { onEnter: () => {
       this._frontOpen = false;
       this._frontDoor.setAngle(0);
+      this._doorSpill.intensity = 0;
       if (!this._frontBlocker) this._frontBlocker = this.addBlocker([-0.55, 0, -5.5], [0.55, 2.2, -5.3]);
     } });
     this.hours.bind('evening', { onLeave: () => {
       this._frontOpen = false;
       this._frontDoor.setAngle(0);
+      this._doorSpill.intensity = 0;
       if (this._frontBlocker) { this.removeBlocker(this._frontBlocker); this._frontBlocker = null; }
     } });
     this.hours.bind('morning', { onEnter: () => this._frontDoor.setAngle(Math.PI / 2) });
