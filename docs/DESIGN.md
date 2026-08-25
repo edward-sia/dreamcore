@@ -16,7 +16,9 @@ roughly one minute per room. The dream starts indoors and close
 (hallway, pool), breathes outward (street, field), passes through
 in-between places (supermarket, platform, theater), turns inward to
 memory itself (house, archive), and ends at the edge of waking (shore).
-Five more follow after a false wake — see Phases 5–7 (XI–XV), below.
+Five more follow after a false wake — see Phases 5–7 (XI–XV), below —
+and five after those, years later, on the other side of every door:
+Phases 8–10 (XVI–XX).
 
 | # | numeral | title | mood | phase |
 |---|---|---|---|---|
