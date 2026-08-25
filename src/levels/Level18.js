@@ -556,7 +556,7 @@ export default class Level18 extends LevelBase {
     const parts = [set, grille, face, this._needle, knob];
     this.hours.bind('night', { objects: parts });
     this.hours.bind('evening', { objects: [...parts, this._strip], interact: [this._strip] });
-    this.hours.bind('morning', { objects: [this._palePatch] });
+    this.hours.bind('morning', { objects: [this._palePatch], interact: [this._palePatch] });
   }
 
   _setNeedle(metres) {
@@ -585,10 +585,22 @@ export default class Level18 extends LevelBase {
 
   _buildChild() {
     const c = makeChild();
+    // rule 12: it is lit — a warm grey you can make out at 3:07, the opposite
+    // of the figure. The torch lens keeps its own emissive, so leave it alone.
+    c.traverse((o) => {
+      if (o.isMesh && o !== c._lens && o.material?.emissive) {
+        o.material.emissive.setHex(0x4a4038);
+        o.material.emissiveIntensity = 0.85;
+      }
+    });
     c.visible = false;
     c.position.copy(D_SPOT);
     c.rotation.y = -Math.PI / 2;                           // facing −X
     this.add(c);
+    // rule 11: a body you cannot walk into. The near rule is off while it
+    // flees, stands still or leaves, so this is what keeps you out of it.
+    // Parked out of the world while it is upstairs.
+    this._childBox = this.addBlocker([1e4, 0, 1e4], [1e4 + 0.1, 1.15, 1e4 + 0.1]);
     this._child = {
       mesh: c, state: 'off', phase: 0, target: null, t: 0, seenT: 0, nearT: 0, baseYaw: -Math.PI / 2, offT: 0, gone: false,
     };
@@ -703,6 +715,7 @@ export default class Level18 extends LevelBase {
 
     // ---- the strip, her things ----
     this.interact(this._strip, { prompt: 'a label on the glass', onInteract: () => this.learnClue({ id: 'l18-dial', title: 'the wireless, at half past eight', body: '247. a label on the glass, in her hand: "ours".' }) });
+    this.interact(this._palePatch, { prompt: 'where the wireless stood', onInteract: () => this.subtitle('A pale square where it stood.', 4) });
     this.interact(this._cup, { prompt: 'the cup', onInteract: () => this._soundEvent('cup') });
     this.interact(this._poker, { prompt: 'the poker', onInteract: () => this._soundEvent('poker') });
     this.interact(this._hatch, { prompt: 'the hatch', onInteract: () => this._soundEvent('hatch') });
@@ -714,11 +727,17 @@ export default class Level18 extends LevelBase {
       this.playSound('locked');
       this.subtitle(this.hours.is('evening') ? 'Not yet. She is still up.' : this.hours.is('morning') ? 'White. The house is gone from here on.' : 'It shut behind you. They always do.', 4);
     } });
-    this.tick(() => { if (this._exitOpen && !this.isCompleted && this.game.player.position.x > 4.4) this.complete(); });
+    this.tick(() => {
+      const pl = this.game.player.position;
+      if (this._exitOpen && !this.isCompleted && pl.x > 4.4) this.complete();
+      // the door shut behind the child while you were out in the stub, so the
+      // blocker was left off: put it back as soon as you are in the room again
+      if (!this._exitOpen && !this._doorBlocker && !this._hallDoor.isOpen() && pl.x < 2.9) this._blockDoor(true);
+    });
 
     // ---- the wireless: one digit per touch ----
     this.interact(this._wireless, { prompt: 'the wireless', onInteract: () => {
-      if (!this.hours.is('night')) { this.subtitle(this.hours.is('evening') ? 'On the station. The needle rests where it always rests.' : 'A pale square where it stood.', 4); return; }
+      if (!this.hours.is('night')) { this.subtitle('On the station. The needle rests where it always rests.', 4); return; }
       if (this._tuned) { this.subtitle('On the station. Low. Leave it.', 3); return; }
       const shown = STATION.split('').map((_, i) => this._digits[i] ?? '·').join(' ');
       this.game.ui.showKeypad({ label: 'the wireless — ' + shown, length: 1, keys: '1234567890', onSubmit: (d) => this._click(d), onCancel: () => {} });
@@ -769,14 +788,15 @@ export default class Level18 extends LevelBase {
     if (c.state === 'off') {
       if (c.offT > 0) return;                                 // it is still upstairs, put off
       const pl = this.game.player.position;
-      // it will not come down while you are standing in its doorway (rule 11)
-      if (Math.hypot(pl.x - D_SPOT.x, pl.z - D_SPOT.z) < 2.2) { c.offT = 2; return; }
       c.mesh.visible = true; c.mesh.position.copy(D_SPOT); c.mesh.rotation.y = c.baseYaw;
       c.mesh.setTorch(!this._torchTaken);
       this._hallDoor.setOpen(true, 1); this._blockDoor(false); this.playSound('door');
       this.cue('the door', new THREE.Vector3(DOOR_POS.x, DOOR_POS.y, DOOR_POS.z));
       if (this._torchTaken && !this._darkSaid) { this._darkSaid = true; this.subtitle('It stands in the doorway without a light, listening for you. You wish you hadn\'t.', 6); }
       c.state = 'wait'; c.t = 0;
+      // you were standing in its doorway when it came down: it sees you at
+      // once and goes back up, so it is never near you (rule 11)
+      if (Math.hypot(pl.x - D_SPOT.x, pl.z - D_SPOT.z) < 1.6) { this._seen(); return; }
     }
     if (c.state === 'flee' || c.state === 'leaving' || c.state === 'still') return;
     c.target = P.clone(); c.state = 'sound'; c.t = 0; c.turnFrom = c.mesh.rotation.y;
@@ -786,14 +806,24 @@ export default class Level18 extends LevelBase {
   /** Would someone small standing at (x, z) be inside the furniture? */
   _blocked(x, z) {
     for (const b of this.solids) {
+      if (b === this._childBox) continue;                     // its own body
       if (b.min.y > 1.0) continue;                            // things it walks under
       if (x > b.min.x - 0.22 && x < b.max.x + 0.22 && z > b.min.z - 0.22 && z < b.max.z + 0.22) return true;
     }
     return false;
   }
 
+  /** Keeps a body-sized blocker on the child (rule 11), or parks it away. */
+  _boxChild(pos) {
+    const b = this._childBox;
+    if (!pos) { b.min.set(1e4, 0, 1e4); b.max.set(1e4 + 0.1, 1.15, 1e4 + 0.1); return; }
+    b.min.set(pos.x - 0.45, 0, pos.z - 0.45);
+    b.max.set(pos.x + 0.45, 1.15, pos.z + 0.45);
+  }
+
   _updateChild(dt) {
     const c = this._child, m = c.mesh;
+    this._boxChild(m.visible ? m.position : null);
     if (c.gone) return;
     if (!this.hours.is('night')) {
       if (c.state !== 'off' || m.visible) {
@@ -830,8 +860,8 @@ export default class Level18 extends LevelBase {
         break;
       }
       case 'look':
-        if (c.t < 1.2) m.rotation.y = c.lookYaw;
-        else if (c.t < 3.2) m.rotation.y = c.lookYaw + Math.sin((c.t - 1.2) * Math.PI) * (45 * Math.PI / 180);
+        if (c.t < 1.0) m.rotation.y = c.lookYaw;
+        else if (c.t < 2.6) m.rotation.y = c.lookYaw + Math.sin((c.t - 1.0) * (Math.PI / 0.8)) * (45 * Math.PI / 180);
         else { c.state = 'return'; c.t = 0; }
         break;
       case 'return':
@@ -924,38 +954,49 @@ export default class Level18 extends LevelBase {
     while (!test() && Date.now() < until) await this.debugWait(0.05);
   }
 
+  /**
+   * Wait under a raised time scale. The crossfade and the child both run on
+   * frame time, and a headless render sits far below real time with the engine
+   * clamping dt — so hurry the waiting along, as XVII does. Every handler,
+   * every test, stays the real one.
+   */
+  async _fastWait(scale, test, cap) {
+    this.game.engine.timeScale = scale;
+    try { await this._waitFor(test, cap); } finally { this.game.engine.timeScale = 1; }
+  }
+
   async debugSolve() {
     const pl = this.game.player, c = this._child;
-    // The crossfade is driven by clamped frame time, so it takes longer than
-    // `fade` seconds on a slow frame — wait for the hour, not for the clock.
     const wind = async (to) => {
       await this._waitFor(() => !this.hours.changing, 16);
       this.debugInteract(this._clockBody);
-      await this._waitFor(() => this.hours.is(to) && !this.hours.changing, 22);
+      await this._fastWait(12, () => this.hours.is(to) && !this.hours.changing, 22);
     };
-    const yawTo = (p) => { const dx = p.x - c.mesh.position.x, dz = p.z - c.mesh.position.z; let d = Math.atan2(dx, dz) - c.mesh.rotation.y; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return Math.abs(d); };
     const alcove = () => pl.teleport(-2.7, 1.9, Math.PI / 2);      // behind the bookcase, out of the beam
     const dial = () => pl.teleport(1.6, -1.2, 0);                  // within reach of the wireless
 
-    await wind('morning');                                          // the torch stays in its box
-    await wind('evening');
-    this.debugInteract(this._strip); await this.debugWait(0.2);     // 247 — ours
-    await wind('night');
+    try {
+      await wind('morning');                                        // the torch stays in its box
+      await wind('evening');
+      this.debugInteract(this._strip); await this.debugWait(0.2);   // 247 — ours
+      await wind('night');
 
-    dial();
-    this.debugInteract(this._wireless); this.game.ui.submitKeypad('2');   // the child comes
-    alcove();
-    await this._waitFor(() => ['look', 'return', 'wait'].includes(c.state) || c.mesh.position.z < 0.2, 16);
-    this.debugInteract(this._cup);                                  // give it something else to look at
-    await this._waitFor(() => c.state !== 'wait' && yawTo(WIRELESS) > 70 * Math.PI / 180, 8);
-    dial();
-    this.debugInteract(this._wireless); this.game.ui.submitKeypad('4');
-    await this.debugWait(0.25);
-    this.debugInteract(this._wireless); this.game.ui.submitKeypad('7');
-    alcove();
-    await this._waitFor(() => this._tuned, 8);
-    await this._waitFor(() => this._exitOpen, 22);
-    await this._waitFor(() => c.gone, 6);
-    pl.teleport(4.8, 1.6); await this.debugWait(0.6);
+      dial();
+      this.debugInteract(this._wireless); this.game.ui.submitKeypad('2');  // the child comes down
+      alcove();                                                     // behind the bookcase before it turns
+      this.debugInteract(this._cup);                                // give it something else to look at
+      await this._fastWait(4, () => c.mesh.position.x < 2.2 || c.state === 'look', 10);
+      dial();
+      this.debugInteract(this._wireless); this.game.ui.submitKeypad('4');
+      await this.debugWait(0.25);
+      this.debugInteract(this._wireless); this.game.ui.submitKeypad('7');
+      alcove();
+      await this._waitFor(() => this._tuned, 8);
+      await this._waitFor(() => this._exitOpen, 22);
+      await this._fastWait(10, () => c.gone, 14);                   // it goes up; you follow
+      pl.teleport(4.8, 1.6); await this.debugWait(0.6);
+    } finally {
+      this.game.engine.timeScale = 1;
+    }
   }
 }
