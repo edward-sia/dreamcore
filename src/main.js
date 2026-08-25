@@ -119,12 +119,12 @@ async function startLevel(id, { skipCard = false } = {}) {
   // there is no ambience, and setAmbience resets dread to 0 — so a room that
   // opens with this.dread(...) only keeps it if its ambience is already up.
   audio.setAmbience(meta.mood);
+  ui.setObjective('');            // clear the last room's line before this one's build() writes its own
   currentLevel = new LevelClass(game);
   currentLevel.init();
   engine.setScene(currentLevel.scene);
   player.spawnAt(currentLevel.spawn.position, currentLevel.spawn.yaw);
   ui.showHUD(true);
-  ui.setObjective('');
 
   if (!skipCard && !window.__TEST_MODE__) {
     await ui.showTitleCard(meta.numeral, meta.title);
