@@ -21,6 +21,7 @@ const FUSE = { x: 2.94, y: 1.5, z: -1.4 };             // on the east wall, faci
 const SWITCH_ORDER = ['porch', 'sitting', 'kitchen', 'yours', 'hall'];     // left → right as you face the box
 const LABELS = ['', 'kitchen', 'hall', 'sitting room', 'your room', 'porch'];  // the plate cycle
 const LABEL_OF = { porch: 'porch', sitting: 'sitting room', kitchen: 'kitchen', yours: 'your room', hall: 'hall' };
+const HER_PLATES = ['porch', 'sitting room', '', 'your room', ''];         // hers, in the morning: the 3rd and 5th fell off
 const OVERHEAD_MUSIC = { x: 1, y: 3.4, z: 0.5 };
 const TUNE = LevelBase.tune('EGAGEGE');
 const HUM = LevelBase.tune('EGAG');
@@ -74,6 +75,7 @@ export default class Level16 extends LevelBase {
     this._visitedEvening = false;
     this._tapPlayedAtNight = false;
     this._overheadArmed = false;
+    this._wasChanging = false;
 
     this._buildShell();
     this._buildFurniture();
@@ -583,7 +585,8 @@ export default class Level16 extends LevelBase {
       this.hours.bind('morning', { objects: [b], colliders: [b], interact: [b] });
     }
     this.hours.bind('morning', { loops: [{ kind: 'idle', position: { x: 8, y: 0.5, z: 1 } }] });
-    this.hours.bind('evening', { loops: [{ kind: 'radio', position: { x: 0.3, y: 1.2, z: -3.2 }, opts: {} }] });
+    // the evening wireless is started in _enterEvening — it wants gain 0.5, and
+    // the hours' loop spec has nowhere to put one
 
     this.track(this.add(makeDust({ count: 70, box: [5.6, 2.4, 4.2], center: [0, 1.3, 0], size: 0.007 })));
   }
@@ -702,11 +705,18 @@ export default class Level16 extends LevelBase {
     // her plates are the morning's; yours are the ones you can write on
     this.hours.bind('night', { objects: this._plates, interact: this._plates });
     this.hours.bind('evening', { objects: this._plates, interact: this._plates });
-    // the morning: her labels, three of five, on a plane over the plates (bound 'morning')
-    const herMat = new THREE.MeshStandardMaterial({ map: this._plateTexture('porch    sitting room    —    your room    —', 1024), roughness: 0.8, transparent: true, opacity: 0.95 });
-    this._herPlates = new THREE.Mesh(new THREE.PlaneGeometry(0.46, 0.04), herMat);
-    this._herPlates.position.set(FUSE.x - 0.062, FUSE.y - 0.12, FUSE.z);
-    this._herPlates.rotation.y = -Math.PI / 2;
+    // the morning: her labels, each under its own switch; the 3rd and 5th fell off
+    this._herPlates = new THREE.Group();
+    const gone = new THREE.MeshStandardMaterial({ color: 0x74777b, roughness: 0.7, metalness: 0.3 });
+    HER_PLATES.forEach((text, i) => {
+      const mat = text
+        ? new THREE.MeshStandardMaterial({ map: this._plateTexture(text), roughness: 0.8 })
+        : gone;                                            // the plate is off; the box's face behind it
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 0.035), mat);
+      plate.position.set(FUSE.x - 0.062, FUSE.y - 0.12, FUSE.z - 0.18 + 0.09 * i);
+      plate.rotation.y = -Math.PI / 2;
+      this._herPlates.add(plate);
+    });
     this.add(this._herPlates);
     this.hours.bind('morning', { objects: [this._herPlates], interact: [this._herPlates] });
     // the pilot lamp
@@ -735,6 +745,8 @@ export default class Level16 extends LevelBase {
     this.add(this._clockFace);
     this.track(this._clockFace);
     this.interact(ring, { prompt: 'the clock', distance: 3.4, onInteract: () => this._wind() });
+    // the rim is a thin torus; aiming at the middle of the clock must work too
+    this.interact(this._clockFace, { prompt: 'the clock', distance: 3.4, onInteract: () => this._wind() });
     this._clockRing = ring;
   }
 
@@ -742,14 +754,21 @@ export default class Level16 extends LevelBase {
 
   _wirePuzzle() {
     // ---- hours: what happens when an hour begins ----
-    this.hours.bind('evening', { onEnter: () => this._enterEvening() });
+    this.hours.bind('evening', { onEnter: () => this._enterEvening(), onLeave: () => this._leaveEvening() });
     this.hours.bind('night', { onEnter: () => this._enterNight(), onLeave: () => this._leaveNight() });
     this.hours.bind('morning', { onEnter: () => { this._hallDoor.setAngle(Math.PI / 2); this.removeBlocker(this._hallBlocker); } });
     this.hours.bind('morning', { onLeave: () => { if (!this._exitOpen) { this._hallDoor.setAngle(0); this._hallBlocker = this.addBlocker([-2.0, 0, -2.4], [-1.0, 2.2, -2.2]); } } });
     this.hours.onChange = (hour) => {
-      this.after(0.9, () => this._applyGlows());
       if (hour === 'morning' && !this._firstMorning) { this._firstMorning = true; this.setObjective('the house, at another hour'); }
     };
+    // The crossfade lerps every light the hours own — the bulb among them — on
+    // frame time, so the lamps the switches own go back on when it has finished.
+    // A wall-clock timer loses that race whenever the frame rate is low.
+    this.tick(() => {
+      const changing = this.hours.changing;
+      if (this._wasChanging && !changing) this._applyGlows();
+      this._wasChanging = changing;
+    });
 
     // ---- the list, the cup, the calendar, the drawing, the boxes ----
     this.interact(this._list, {
@@ -846,7 +865,7 @@ export default class Level16 extends LevelBase {
         this.subtitle('You put it down where small hands can find it. It will be warm for a while.', 5);
         this.whenUnseen(this._chairSouthN, () => {
           this._chairSouthN.position.z += 0.3;
-          this.playSoundAt('door', { x: 0, y: 0.5, z: 1.0 }, { });
+          this.playSoundAt('door', { x: 0, y: 0.5, z: 1.0 }, { soft: true });
           this.whenSeen(this._chairSouthN, () => this.subtitle('The chair is out again. Somebody sat down to supper.', 5));
         });
       },
@@ -868,7 +887,7 @@ export default class Level16 extends LevelBase {
       this._overheadT = (this._overheadT ?? 20) + dt;
       if (this._overheadT > 45) {
         this._overheadT = 0;
-        this.footsteps([{ x: 1, y: 3.4, z: -1 }, { x: 0.5, y: 3.4, z: 1.5 }], { stride: 0.6, every: 0.5, opts: { soft: true } });
+        this.footsteps([{ x: 1, y: 3.4, z: -1 }, { x: 0.5, y: 3.4, z: 1.5 }], { stride: 1.2, every: 0.5, opts: { soft: true } });
         if (!this._overheadCued) { this._overheadCued = true; this.cue('something small, turning over, upstairs', new THREE.Vector3(0.8, 3.4, 0.2)); }
       }
     });
@@ -882,16 +901,32 @@ export default class Level16 extends LevelBase {
     this._hallLight.intensity = night && this._on.hall ? 1.5 : 0;
     this._hatchGlow.material.emissiveIntensity = evening || (night && this._on.sitting) ? 1.2 : 0;
     this._crackGlow.visible = !!(night && this._on.yours);
-    if (night) this._bulb.light.intensity = this._on.kitchen ? 4.5 : 0;
+    if (!night) return;
+    this._bulb.light.intensity = this._on.kitchen ? 4.5 : 0;
+    // the hatch must not glow with no wireless, nor the crack with no music box
+    if (this._on.sitting && !this._hatchRadio) {
+      this._hatchRadio = this.loopAt('radio', { x: 0.3, y: 1.2, z: -2.4 });
+      this._hatchRadio.setGain(0.4);
+    }
+    if (this._on.yours && !this._timers.yours) this._windMusicBox();
+  }
+
+  /** The music box upstairs, re-armed every 6 s for as long as her switch is on. */
+  _windMusicBox() {
+    if (!this.hours.is('night') || !this._on.yours) { this._timers.yours = null; return; }
+    this.playSoundAt('musicbox', OVERHEAD_MUSIC, { notes: TUNE, step: 0.36, slow: 0.05, holdSeconds: 6 });
+    this._timers.yours = this.after(6, () => this._windMusicBox());
   }
 
   _enterEvening() {
     this._visitedEvening = true;
+    this._eveningRadio = this.loopAt('radio', { x: 0.3, y: 1.2, z: -3.2 });
+    this._eveningRadio.setGain(0.5);                       // faint, through the hatch
     if (this._eveningOnce) return;
     this._eveningOnce = true;
-    const tap = this.loopAt('tap', this._tapPos);
+    this._tap = this.loopAt('tap', this._tapPos);
     this.after(12, () => {
-      tap.stop(0.8);
+      this._stopTap(0.8);
       this.after(5, () => {
         if (!this.hours.is('evening')) return;
         this.playSoundAt('hummed', { x: -1.5, y: 1.5, z: -2.8 }, { notes: HUM });
@@ -904,16 +939,30 @@ export default class Level16 extends LevelBase {
   _enterNight() {
     if (this._visitedEvening && !this._tapPlayedAtNight) {
       this._tapPlayedAtNight = true;
-      const tap = this.loopAt('tap', this._tapPos);
+      this._tap = this.loopAt('tap', this._tapPos);
       this.cue('the tap', new THREE.Vector3(this._tapPos.x, this._tapPos.y, this._tapPos.z));
-      this.after(10, () => tap.stop(1.0));
+      this.after(10, () => this._stopTap(1.0));
     }
   }
 
+  /** The tap belongs to the hour that turned it on; it does not follow you out of it. */
+  _stopTap(fade = 0.6) {
+    this._tap?.stop(fade);
+    this._tap = null;
+  }
+
+  _leaveEvening() {
+    this._eveningRadio?.stop(0.6);
+    this._eveningRadio = null;
+    this._stopTap();
+  }
+
   _leaveNight() {
+    this._stopTap();
     this._hatchRadio?.stop(0.5);
     this._hatchRadio = null;
     clearTimeout(this._timers.yours);
+    this._timers.yours = null;
     this._crackGlow.visible = false;
     this._strip.material.emissiveIntensity = 0;
     this._hallLight.intensity = 0;
@@ -955,16 +1004,12 @@ export default class Level16 extends LevelBase {
       } else { this._hatchRadio?.stop(0.5); this._hatchRadio = null; }
     } else if (k === 'yours') {
       if (on) {
-        const wind = () => {
-          this.playSoundAt('musicbox', OVERHEAD_MUSIC, { notes: TUNE, step: 0.36, slow: 0.05, holdSeconds: 6 });
-          this._timers.yours = this.after(6, wind);
-        };
-        wind();
+        this._windMusicBox();
         this._crackGlow.visible = true;
         this.subtitle('A music box, upstairs. Winding down.', 4);
         this.cue('a music box, upstairs', new THREE.Vector3(OVERHEAD_MUSIC.x, OVERHEAD_MUSIC.y, OVERHEAD_MUSIC.z));
         note('a music box, upstairs. your room.');
-      } else { clearTimeout(this._timers.yours); this._crackGlow.visible = false; }
+      } else { clearTimeout(this._timers.yours); this._timers.yours = null; this._crackGlow.visible = false; }
     }
   }
 
