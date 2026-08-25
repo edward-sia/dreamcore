@@ -51,6 +51,17 @@ export default class Level17 extends LevelBase {
       'and something small came down, and found them, and went on ahead.',
   };
 
+  /**
+   * How fast this room's own timers run. 1 for a player, always. debugSolve
+   * turns it up while the rehearsal walks so the playtest does not spend
+   * nineteen seconds listening to footsteps; every step, check and subtitle
+   * still runs, in order, through the same handlers.
+   */
+  _speed = 1;
+
+  /** Every timer of the room goes through here — footsteps() included. */
+  after(seconds, fn) { return super.after(seconds / (this._speed || 1), fn); }
+
   build() {
     applyFog(this.scene, '#0a0a10', 1.5, 14);
     this.hours = new Hours(this, { initial: 'night' });
@@ -59,6 +70,7 @@ export default class Level17 extends LevelBase {
     this._clockLocked = false;
     this._placed = { note: null, key: null, slippers: false };   // null | 'table' | 'pedestal'
     this._rehearsing = false;
+    this._walking = false;        // a walk is in the hall — the retreat after a failure included
     this._rehearsals = 0;
     this._exitOpen = false;
     this._frontOpen = false;
@@ -252,7 +264,7 @@ export default class Level17 extends LevelBase {
       { vertical: false, at: 0, lo: -1.7, hi: 1.7, h: H, pos: HOUSE.z1 + 0.1 })) this._at(EM, seg, { collide: true });
 
     // ---- the front door, the porch, III's street beyond it ----
-    this._frontDoor = makeDoor({ color: '#8a6f52' });
+    this._frontDoor = makeDoor({ color: '#4f3d2e' });
     this._frontDoor.position.set(0, 0, HOUSE.z0);
     this.add(this._frontDoor);
     this.track(this._frontDoor);
@@ -618,7 +630,7 @@ export default class Level17 extends LevelBase {
     this._pedestal = this._at(N, ped, { collide: true, touch: true });
 
     // the door at the end
-    this._endDoor = makeDoor({ width: 1.0, color: '#a3866a', frameColor: '#5a4737' });
+    this._endDoor = makeDoor({ width: 1.0, color: '#4f3d2e', frameColor: '#3c2f24' });
     this._endDoor.position.set(0, 0, END_Z);
     this.add(this._endDoor);
     this.track(this._endDoor);
@@ -664,6 +676,9 @@ export default class Level17 extends LevelBase {
 
   _wind() {
     if (this._clockLocked || this.hours.changing) return;
+    // Not while something is walking the hall: another hour takes the corridor
+    // away under it, and the door it opens is only there at 3:07.
+    if (this._rehearsing || this._walking) { this.subtitle('Not now. Something small is out in the hall.', 4); return; }
     this.playSoundAt('wind', CLOCK_POS);
     const next = this.hours.order[(this.hours.order.indexOf(this.hours.current) + 1) % 3];
     const [h, m] = { night: [3, 7], morning: [7, 15], evening: [8, 30] }[next];
@@ -681,9 +696,8 @@ export default class Level17 extends LevelBase {
     const hemiE = new THREE.HemisphereLight(0x5a4a3a, 0x1a1410, 0);
     const hemiM = new THREE.HemisphereLight(0xffffff, 0xcfcac0, 0);
     this.add(hemiN, hemiE, hemiM);
-    const moon = new THREE.PointLight(0x6c7ea8, 0, 8, 1.8);
-    moon.position.set(windowPos.x, windowPos.y, windowPos.z);
-    this.add(moon);
+    // No moon here: the hall has no window at any hour, so the night is I's
+    // bulbs and nothing else (spec §5.2, the hours table).
     const sun = new THREE.DirectionalLight(0xfff2dc, 0);
     sun.position.set(sunFrom.x, sunFrom.y, sunFrom.z);
     sun.target.position.set(0, 1, 0);
@@ -695,7 +709,7 @@ export default class Level17 extends LevelBase {
     const GRADE_N = { vignette: 1.3, grain: 0.038, desat: 0.2, lift: 0.02, fringe: 0.0007 };
     const GRADE_E = { vignette: 1.2, grain: 0.03, desat: 0.08, lift: 0.03, fringe: 0.0005 };
     const GRADE_M = { vignette: 0.9, grain: 0.045, desat: 0.35, lift: 0.09, fringe: 0.001 };
-    this.hours.bind('night', { lights: [{ light: hemiN, intensity: 0.35 }, { light: moon, intensity: 1.2 }], fog: { color: '#0a0a10', near: 1.5, far: 14 }, grade: GRADE_N, mood: this.constructor.meta.mood });
+    this.hours.bind('night', { lights: [{ light: hemiN, intensity: 0.35 }], fog: { color: '#0a0a10', near: 1.5, far: 14 }, grade: GRADE_N, mood: this.constructor.meta.mood });
     this.hours.bind('evening', { lights: [{ light: hemiE, intensity: 0.45 }], fog: { color: '#1a140f', near: 2, far: 18 }, grade: GRADE_E, mood: 'evening' });
     this.hours.bind('morning', { lights: [{ light: hemiM, intensity: 1.5 }, { light: sun, intensity: 1.4 }], fog: { color: '#d8d5ce', near: 1, far: 9 }, grade: GRADE_M, mood: 'morning',
       loops: [{ kind: 'birds', position: windowPos }] });
@@ -840,6 +854,7 @@ export default class Level17 extends LevelBase {
 
   /** The child's dream walks the hall: mat → table → pedestal → the door; it stops at the first thing that is wrong. */
   _rehearse() {
+    this._walking = true;
     const soft = this._placed.slippers;
     const opts = { soft };
     const w = { x: MAT.x, z: MAT.z };                                            // the walker's last position
@@ -848,7 +863,8 @@ export default class Level17 extends LevelBase {
       const dir = { x: MAT.x - pos.x, z: MAT.z - pos.z };
       const len = Math.hypot(dir.x, dir.z) || 1;
       const d = Math.min(len, n * 0.55);
-      this.footsteps([{ x: pos.x, y: 0, z: pos.z }, { x: pos.x + dir.x / len * d, y: 0, z: pos.z + dir.z / len * d }], { stride: 0.55, every: 0.26, opts });
+      this.footsteps([{ x: pos.x, y: 0, z: pos.z }, { x: pos.x + dir.x / len * d, y: 0, z: pos.z + dir.z / len * d }],
+        { stride: 0.55, every: 0.26, opts, onDone: () => { this._walking = false; } });
     };
     const fail = (line, secs) => { this._rehearsing = false; this._rehearsals++; this.subtitle(line, secs); this.setObjective('leave them where it will look');
       if (this._rehearsals >= 3) this.after(secs, () => this.subtitle('It comes down in her slippers, reads the note by the door, and looks where the flowers used to be. That is the whole of it.', 8)); };
@@ -890,6 +906,7 @@ export default class Level17 extends LevelBase {
         this.playSoundAt('pickup', { x: PEDESTAL.x, y: PEDESTAL.y, z: PEDESTAL.z });
         this.after(1.0, () => walk({ x: 0, z: -30.0 }, () => {
           this._rehearsing = false;
+          this._walking = false;
           this._exitOpen = true;
           this._clockLocked = true;
           this.playSoundAt('unlock', { x: 0, y: 1.0, z: END_Z });
@@ -928,12 +945,15 @@ export default class Level17 extends LevelBase {
       this.debugInteract(this._mat); await this._waitFor(() => this._placed.slippers, 3);
       this.debugInteract(this._table); await this._waitFor(() => this._placed.note === 'table', 3);
       this.debugInteract(this._pedestal); await this._waitFor(() => this._placed.key === 'pedestal', 3);
+      this._speed = 8;                       // the walk, at eight times its own pace
       this.debugInteract(this._endDoor);
       await this._waitFor(() => this._exitOpen, 32);
+      this._speed = 1;
       pl.teleport(0, -32);
       await this._waitFor(() => this.isCompleted, 8);
     } finally {
       this.game.engine.timeScale = 1;
+      this._speed = 1;
     }
   }
 }
