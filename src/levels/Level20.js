@@ -54,7 +54,7 @@ export default class Level20 extends LevelBase {
     this._clockStopped = false; this._clockWrong = 0;
     this._out = false; this._doorOpen = false; this._doorShut = false; this._locked = false;
     this._answered = false; this._lightOn = true; this._lightStage = 0;
-    this._holdStill = 0; this._breathT = 0;
+    this._holdStill = 0; this._breathT = 0; this._lyingDown = false;
     this._sheetHeld = false; this._boxOpen = false; this._noteTaken = false; this._glassSeen = false;
     this._doorBlocker = null; this._wbBlocker = null;
 
@@ -858,9 +858,10 @@ export default class Level20 extends LevelBase {
       const ok = this._done.chair && this._done.sheet && this._done.wound && this._done.note;
       if (!ok) {
         // The first touch is the discovery, and _advance says so; the nudge
-        // would only overwrite it in the same breath.
+        // would only overwrite it in the same breath. It still counts, so the
+        // second wrong flip says where to look, as the spec asks.
+        this._clockWrong++;
         if (this._wound) {
-          this._clockWrong++;
           this.playSound('tick');
           this.subtitle(
             this._clockWrong >= 2 ? 'Half past eight shows you how she left it.' : 'Not yet. It isn\'t how she left it.',
@@ -905,10 +906,20 @@ export default class Level20 extends LevelBase {
       if (this._wbBlocker) { this.removeBlocker(this._wbBlocker); this._wbBlocker = null; }
       this.playSound('door');
       this.setObjective('how she left it');
-      this.whenUnseen(this._backPanel, () => {
+      // It shuts the first time it is unseen *after you are inside*. Shutting
+      // it while you are still in the stub would leave a closed panel with no
+      // blocker behind it — a shut door you walk through — and blocking it
+      // there would seal you in the stub. whenUnseen fires once wherever you
+      // are standing, so the wait is counted here instead.
+      let unseen = 0;
+      const shut = this.tick((dt) => {
+        if (pl.position.z >= 1.7 || this.isSeen(this._backPanel)) { unseen = 0; return; }
+        unseen += dt;
+        if (unseen < 0.4) return;
+        shut();
         this._backPanel.setOpen(false);
         this.playSoundAt('door', { x: -0.55, y: 1, z: 1.79 });
-        if (pl.position.z < 1.7) this._wbBlocker = this.addBlocker([-1.0, 0, 1.7], [-0.1, 2.2, 1.9]);
+        this._wbBlocker = this.addBlocker([-1.0, 0, 1.7], [-0.1, 2.2, 1.9]);
       });
     } });
 
@@ -1048,7 +1059,7 @@ export default class Level20 extends LevelBase {
       if (this._doorOpen && pl.position.z > 1.9) {               // from outside: shut it
         this._doorOpen = false; this._doorShut = true; this._out = true;
         this._door.setOpen(false); this.playSound('door');
-        this.after(0.8, () => this._setDoorway(false));
+        this._setDoorway(false);            // at once: a delay here is a step back inside, and the room seals behind you
         this.setObjective('the little key');
         return;
       }
@@ -1138,7 +1149,7 @@ export default class Level20 extends LevelBase {
     this.interact(this._herDoor, { prompt: 'her door', onInteract: () => {
       if (this.hours.is('morning')) { this.subtitle('White. The house is gone from here on.', 5); return; }
       if (this.hours.is('evening')) { this.playSound('locked'); this.subtitle('Not yet. She is still up.', 4); return; }
-      if (this._lightStage < 2) {
+      if (this._lightStage < 2 || !this._lightOn) {
         this.playSound('locked');
         this.subtitle(this._lightOn ? 'Her room. Not yet.' : 'Not in the dark. Not for them.', 4);
         return;
@@ -1148,8 +1159,15 @@ export default class Level20 extends LevelBase {
         if (this._herBlocker) { this.removeBlocker(this._herBlocker); this._herBlocker = null; }
         this.playSound('door');
       }
+      this.game.interaction.setEnabled(this._herBed, true);      // the bed is the end of the chain, and no sooner
     } });
-    this.interact(this._herBed, { prompt: 'lie down', once: true, onInteract: () => {
+    // Enabled only when her door opens. The interaction raycast hits registered
+    // objects through walls, so an ungated bed is a two-press level: the panel,
+    // then 'lie down' aimed at her wall from the landing.
+    this.interact(this._herBed, { prompt: 'lie down', enabled: false, onInteract: () => {
+      if (this._lyingDown) return;
+      if (!this._lightOn) { this.subtitle('Not in the dark. Not for them.', 4); return; }
+      this._lyingDown = true;
       this.subtitle('You lie down, the way she did, and the light stays on.', 4);
       this.after(1.6, () => this.complete());
     } });
