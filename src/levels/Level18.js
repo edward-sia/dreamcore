@@ -20,7 +20,10 @@ const WIRELESS = { x: 2.0, y: 0.85, z: -2.3 };
 const SET_Y = 0.89;                                    // the set sits on the table top (0.74)
 const DOOR_POS = { x: 3.2, y: 1.2, z: 1.6 };
 const D_SPOT = new THREE.Vector3(2.4, 0, 1.6);        // the child's place just inside the door
+const IN_DOOR = new THREE.Vector3(3.55, 0, 1.6);      // in the hall, where it comes in from
 const OUT = new THREE.Vector3(3.8, 0, 1.6);           // through the door, out of sight
+const KEEP = 2.0;                                     // rule 11: two metres of air, both ways about
+const NEAR = 2.2;                                     // it turns before you are even that close
 const HEARTH = { x: -2.9, y: 0.3, z: 0.4 };           // the poker, and the fire
 const CUP = { x: -0.95, y: 0.75, z: 2.2 };
 const HATCH = { x: 3.15, y: 1.2, z: -1.5 };
@@ -597,12 +600,11 @@ export default class Level18 extends LevelBase {
     c.position.copy(D_SPOT);
     c.rotation.y = -Math.PI / 2;                           // facing −X
     this.add(c);
-    // rule 11: a body you cannot walk into. The near rule is off while it
-    // flees, stands still or leaves, so this is what keeps you out of it.
-    // Parked out of the world while it is upstairs.
+    // rule 11: a body you cannot walk into, inside the two metres of air that
+    // _keepOut holds around it. Parked out of the world while it is upstairs.
     this._childBox = this.addBlocker([1e4, 0, 1e4], [1e4 + 0.1, 1.15, 1e4 + 0.1]);
     this._child = {
-      mesh: c, state: 'off', phase: 0, target: null, t: 0, seenT: 0, nearT: 0, baseYaw: -Math.PI / 2, offT: 0, gone: false,
+      mesh: c, state: 'off', phase: 0, target: null, pending: null, t: 0, seenT: 0, nearT: 0, baseYaw: -Math.PI / 2, offT: 0, gone: false,
     };
     this._childOccluders = [this._breast, this._bookcase, ...this._chairBacks];
   }
@@ -745,6 +747,7 @@ export default class Level18 extends LevelBase {
 
     // ---- the child ----
     this.tick((dt) => this._updateChild(dt));
+    this.tick(() => this._keepOut());                     // after it has moved
   }
 
   _click(d) {
@@ -788,16 +791,27 @@ export default class Level18 extends LevelBase {
     if (c.state === 'off') {
       if (c.offT > 0) return;                                 // it is still upstairs, put off
       const pl = this.game.player.position;
-      c.mesh.visible = true; c.mesh.position.copy(D_SPOT); c.mesh.rotation.y = c.baseYaw;
-      c.mesh.setTorch(!this._torchTaken);
+      c.mesh.position.copy(IN_DOOR); c.mesh.rotation.y = c.baseYaw;
       this._hallDoor.setOpen(true, 1); this._blockDoor(false); this.playSound('door');
       this.cue('the door', new THREE.Vector3(DOOR_POS.x, DOOR_POS.y, DOOR_POS.z));
+      // you were standing in the doorway it opens: it hears you from the hall
+      // and goes straight back up without coming in, so it is never within
+      // two metres of you (rule 11). It costs the digits, never the room.
+      if (Math.hypot(pl.x - IN_DOOR.x, pl.z - IN_DOOR.z) < KEEP) {
+        this._seen();                                         // the gasp, the flinch, the digits
+        c.state = 'off'; c.phase = 0; c.offT = 12; c.mesh.visible = false;
+        this.after(1.0, () => {
+          if (this._exitOpen || this._child.state !== 'off') return;
+          this._hallDoor.setOpen(false); this.playSound('door');
+          if (this.game.player.position.x < 3.05) this._blockDoor(true);
+        });
+        return;
+      }
+      c.mesh.visible = true; c.mesh.setTorch(!this._torchTaken);
       if (this._torchTaken && !this._darkSaid) { this._darkSaid = true; this.subtitle('It stands in the doorway without a light, listening for you. You wish you hadn\'t.', 6); }
-      c.state = 'wait'; c.t = 0;
-      // you were standing in its doorway when it came down: it sees you at
-      // once and goes back up, so it is never near you (rule 11)
-      if (Math.hypot(pl.x - D_SPOT.x, pl.z - D_SPOT.z) < 1.6) { this._seen(); return; }
+      c.state = 'enter'; c.t = 0; c.pending = null;            // §5.3 OFF: it walks in to D
     }
+    if (c.state === 'enter') { c.pending = P.clone(); return; }  // the sound waits until it is in
     if (c.state === 'flee' || c.state === 'leaving' || c.state === 'still') return;
     c.target = P.clone(); c.state = 'sound'; c.t = 0; c.turnFrom = c.mesh.rotation.y;
     c.turnTo = Math.atan2(P.x - c.mesh.position.x, P.z - c.mesh.position.z);
@@ -821,6 +835,24 @@ export default class Level18 extends LevelBase {
     b.max.set(pos.x + 0.45, 1.15, pos.z + 0.45);
   }
 
+  /**
+   * Rule 11, in every state: two metres of air between you and it. The near
+   * rule only guards the states it can see you in — while it flees, stands
+   * still or leaves, this is what holds you off. It corrects the step you
+   * just took, and the child will not step inside the circle itself, so it is
+   * a wall you walk into and never a shove.
+   */
+  _keepOut() {
+    const m = this._child.mesh;
+    if (!m.visible) return;
+    const p = this.game.player;
+    const dx = p.position.x - m.position.x, dz = p.position.z - m.position.z;
+    const d = Math.hypot(dx, dz);
+    if (d >= KEEP) return;
+    if (d < 1e-3) { p.teleport(m.position.x + KEEP, m.position.z); return; }
+    p.teleport(m.position.x + dx * (KEEP / d), m.position.z + dz * (KEEP / d));
+  }
+
   _updateChild(dt) {
     const c = this._child, m = c.mesh;
     this._boxChild(m.visible ? m.position : null);
@@ -834,7 +866,7 @@ export default class Level18 extends LevelBase {
     }
     if (c.offT > 0) {
       c.offT -= dt;
-      if (c.offT <= 0) { this._summon(D_SPOT.clone()); if (c.state === 'sound') { c.state = 'wait'; c.t = 0; c.target = null; } }
+      if (c.offT <= 0) this._summon(D_SPOT.clone());          // the door opens by itself
       return;
     }
     if (c.state === 'off') return;
@@ -847,10 +879,23 @@ export default class Level18 extends LevelBase {
       const nx = m.position.x + dx / d * step, nz = m.position.z + dz / d * step;
       m.rotation.y = Math.atan2(dx, dz);
       if (avoid && this._blocked(nx, nz)) return true;        // it stops at the furniture
+      // rule 11 the other way about: it will not step inside two metres of
+      // you either. It holds where it is until you are out of its way. Only
+      // when it is in the room — a child you never saw come in walks its way
+      // out whatever you do, or you would never hear it go up.
+      if (m.visible && Math.hypot(nx - pl.x, nz - pl.z) < KEEP) return false;
       m.position.x = nx; m.position.z = nz;
       return d - step <= stopAt + 0.01;
     };
     switch (c.state) {
+      case 'enter':                                           // in from the hall, to its place by the door
+        if (moveToward(D_SPOT, 1.1, 0.05)) {
+          m.position.copy(D_SPOT);
+          c.state = 'wait'; c.t = 0;
+          const P = c.pending; c.pending = null;             // now the sound that fetched it
+          if (P && Math.hypot(P.x - m.position.x, P.z - m.position.z) > 0.2) this._summon(P);
+        }
+        break;
       case 'wait':
         m.rotation.y = c.baseYaw + Math.sin(c.t * (2 * Math.PI / 7)) * (65 * Math.PI / 180);
         break;
@@ -871,7 +916,7 @@ export default class Level18 extends LevelBase {
         }
         break;
       case 'flee': {                                          // to the door, then out; phase 0 → 1
-        if (c.phase !== 1) { if (moveToward(D_SPOT, 2.2, 0.05)) c.phase = 1; }
+        if (c.phase !== 1) { if (m.position.x > D_SPOT.x || moveToward(D_SPOT, 2.2, 0.05)) c.phase = 1; }
         else if (moveToward(OUT, 2.2, 0.05)) {
           m.visible = false; c.state = 'off'; c.phase = 0; c.offT = 12;
           this._hallDoor.setOpen(false); this.playSound('door');
@@ -880,7 +925,7 @@ export default class Level18 extends LevelBase {
         return;
       }
       case 'leaving': {
-        if (c.phase !== 1) { if (moveToward(D_SPOT, 1.0, 0.05)) c.phase = 1; }
+        if (c.phase !== 1) { if (m.position.x > D_SPOT.x || moveToward(D_SPOT, 1.0, 0.05)) c.phase = 1; }
         else if (moveToward(OUT, 1.0, 0.05)) {
           m.visible = false; c.gone = true;
           this.footsteps([{ x: 3.4, y: 0, z: 1.6 }, { x: 5.0, y: 1.8, z: 1.6 }], { every: 0.45, opts: { soft: true } });
@@ -890,10 +935,13 @@ export default class Level18 extends LevelBase {
       }
       case 'still': return;
     }
-    // the seen-test: inside its beam for 0.45 s, or within 1.6 m for 0.3 s
+    // the seen-test: inside its beam for 0.45 s, or within NEAR for 0.3 s.
+    // NEAR sits just outside the two metres _keepOut holds, so walking up to
+    // it still turns it — the spec's 1.6 m is inside the wall and could never
+    // fire, and with the torch taken the near rule is the only test there is.
     const eye = new THREE.Vector3(0, 0.95, 0);
     const inBeam = !this._torchTaken && this.isSeenBy(m, { angleDeg: 22, maxDist: 9, occluders: this._childOccluders, eye });
-    const near = Math.hypot(pl.x - m.position.x, pl.z - m.position.z) < 1.6;
+    const near = Math.hypot(pl.x - m.position.x, pl.z - m.position.z) < NEAR;
     c.seenT = inBeam ? c.seenT + dt : 0;
     c.nearT = near ? c.nearT + dt : 0;
     if (c.seenT >= 0.45 || c.nearT >= 0.3) this._seen();
