@@ -149,6 +149,18 @@ export default class Level19 extends LevelBase {
   }
 
   /**
+   * A floor the downward raycast can find only at the hours it belongs to.
+   * Hours hides an object at the other hours; it cannot unregister a ground,
+   * and the raycast ignores visibility, so an hour-only floor over another
+   * hour's drop has to be added and dropped by hand.
+   */
+  _hourGround(mesh, hours) {
+    const on = () => { if (!this.grounds.includes(mesh)) this.grounds.push(mesh); };
+    const off = () => { const i = this.grounds.indexOf(mesh); if (i >= 0) this.grounds.splice(i, 1); };
+    for (const h of this.hours.order) this.hours.bind(h, { onEnter: hours.includes(h) ? on : off });
+  }
+
+  /**
    * Pack everything added to the root since `from` into one group, and make
    * that group the hour's only object: a room behind a shut door is never in
    * shot, and this scene is fill-bound, so it should not be drawn either.
@@ -606,7 +618,15 @@ export default class Level19 extends LevelBase {
   _buildArchive() {
     const s = spec(), from = this.root.children.length;
     const X0 = -6.2, X1 = -1.2, Z0 = -1.0, Z1 = 2.0;
-    this._hourBox(s, X1 - X0, 0.2, Z1 - Z0, this._flat(makeMat('checker', { a: '#b9b2a2', b: '#8e897d', repeat: [4, 3] })), (X0 + X1) / 2, LAND_Y - 0.1, (Z0 + Z1) / 2, { collide: false, ground: true });
+    // The archive stands over the shaft: its floor spans the whole of the L0
+    // south flight. The ground raycast does not look at object.visible, so
+    // registered once and for good it is what you stand on at 3:07 too — over
+    // the flight, on nothing, all the way to the west wall. So it is ground at
+    // every hour but that one. The evening keeps it because nothing can reach
+    // out here then anyway, and a floor is a kinder thing to cross an hour on
+    // than a shaft that is not being drawn.
+    const floor = this._hourBox(s, X1 - X0, 0.2, Z1 - Z0, this._flat(makeMat('checker', { a: '#b9b2a2', b: '#8e897d', repeat: [4, 3] })), (X0 + X1) / 2, LAND_Y - 0.1, (Z0 + Z1) / 2, { collide: false });
+    this._hourGround(floor, ['morning', 'evening']);
     this._hourBox(s, X1 - X0 + 0.4, 0.2, Z1 - Z0 + 0.4, this._ceilMat, (X0 + X1) / 2, CEIL + 0.1, (Z0 + Z1) / 2, { collide: false });
     this._hourBox(s, 0.2, CEIL - LAND_Y, Z1 - Z0 + 0.4, this._plaster, X0 - 0.1, (LAND_Y + CEIL) / 2, (Z0 + Z1) / 2);
     this._hourBox(s, X1 - X0, CEIL - LAND_Y, 0.2, this._plaster, (X0 + X1) / 2, (LAND_Y + CEIL) / 2, Z0 - 0.1);
@@ -849,7 +869,20 @@ export default class Level19 extends LevelBase {
       bulb.position.set(MAIN_CX, 0, ZC - 0.45);
       fg.add(bulb);
       s.lights.push({ light: bulb.light, intensity: 3.2 });
-      this._shaftBulbs.push({ light: bulb.light, x: MAIN_CX, y: y + 2.3, z: ZC - 0.45, radius: 6.6 });
+      const rec = { light: bulb.light, x: MAIN_CX, y: y + 2.3, z: ZC - 0.45, radius: 6.6 };
+      this._shaftBulbs.push(rec);
+      if (f === 2) this._flick = { rec, base: 3.2, next: 0, on: true };   // G's bulb is the one that stutters
+      if (f === 3) {
+        // −1's bulb is the shaft's one shadow-caster, as XII's is. A point
+        // light draws the scene six times over for its cube map, which is a
+        // fifth of the frame in this room, so the map is small and the budget
+        // below only asks for it while the child is standing on this landing —
+        // the only thing down here that a shadow is ever about.
+        this._shadowBulb = rec;
+        bulb.light.shadow.mapSize.set(256, 256);
+        bulb.light.shadow.bias = -0.004;
+        bulb.light.shadow.normalBias = 0.04;
+      }
       const hb = this._bulb({ color: 0xd8dcd0, intensity: 0, distance: 10, y: yh + 2.45 });
       hb.position.set(HALF_CX, 0, ZC + 0.45);
       fg.add(hb);
@@ -994,6 +1027,23 @@ export default class Level19 extends LevelBase {
         g.light.visible = want;
         if (g.light.userData.glow) g.light.userData.glow.material.emissiveIntensity = g.light.intensity > 0.02 ? 3.5 : 0;
       }
+      const sb = this._shadowBulb, w = this._wMesh;
+      sb.light.castShadow = sb.light.visible && w.visible && Math.abs(w.position.y - LANDINGS[3][1]) < 1.5;
+    });
+
+    // G's bulb stutters. It rides on top of the budget above, so the glass
+    // goes dim with the light, and it keeps off the hours' crossfade, which
+    // owns this intensity while it is running.
+    this.tick((dt, t) => {
+      const f = this._flick;
+      if (!this.hours.is('night') || this.hours.changing) return;
+      if (t >= f.next) {
+        f.on = Math.random() > 0.28;
+        f.next = t + (f.on ? 0.15 + Math.random() * 1.8 : 0.04 + Math.random() * 0.14);
+      }
+      f.rec.light.intensity = f.on ? f.base : f.base * 0.12;
+      const glow = f.rec.light.userData.glow;
+      if (glow) glow.material.emissiveIntensity = f.on ? 3.5 : 0.5;
     });
   }
 
@@ -1547,6 +1597,12 @@ export default class Level19 extends LevelBase {
     this._approachFloor = f;
     const y = LANDINGS[f][1];
     this._wTarget = new THREE.Vector3(MAIN_CX, y, Z_SOUTH);
+    // It walks to the landing along the stairs, not through them: a straight
+    // line from a tread to the landing centre runs under the treads, and its
+    // feet come out below the flight — which is the one angle this room ever
+    // shows it from. The landing is the path point one floor down from L0's.
+    this._wS = this._projectOnPath(this._wMesh.position).s;
+    this._wTargetS = f * this._floorLen;
     // the top two steps of the south flight below its landing: you stop about
     // two metres short, on the flight, looking up at it
     this._approachBlocker = this.addBlocker([FLIGHT.x1 - 0.56, y - 0.6, ZS.s0], [FLIGHT.x1, y + 2.2, ZS.s1]);
@@ -1559,11 +1615,16 @@ export default class Level19 extends LevelBase {
 
   _runApproach(rdt, v) {
     const w = this._wMesh, p = this.game.player.position;
-    const d = w.position.distanceTo(this._wTarget);
-    if (d > 0.05) {
-      w.position.lerp(this._wTarget, Math.min(1, (rdt * 0.8) / Math.max(d, 0.01)));
+    const gap = this._wTargetS - this._wS;
+    const arrived = Math.abs(gap) < 0.02;
+    if (!arrived) {
+      this._wS += Math.sign(gap) * Math.min(rdt * 0.8, Math.abs(gap));
+      w.position.copy(this._pointAt(this._wS));
       w.faceToward(this._wTarget);
-    } else w.rotation.y = Math.PI / 2;                             // facing +X, its door
+    } else {
+      w.position.copy(this._wTarget);
+      w.rotation.y = Math.PI / 2;                                  // facing +X, its door
+    }
     w.visible = true;
     if (v > 0.3 && !this._breathed) {
       this._moved += rdt;
@@ -1571,7 +1632,9 @@ export default class Level19 extends LevelBase {
     } else this._moved = 0;
     const head = new THREE.Vector3(p.x, p.y, p.z);
     const wHead = w.position.clone().add(new THREE.Vector3(0, 1.0, 0));
-    if (!this._breathed && head.distanceTo(wHead) < 2.8 && head.y < wHead.y + 0.6) {
+    // it has to have stopped before you can be the thing that stops it: the
+    // walk into the stub starts from the landing, never from mid-flight
+    if (arrived && !this._breathed && head.distanceTo(wHead) < 2.8 && head.y < wHead.y + 0.6) {
       this._breathed = true;
       this.playSound('breath');
       this.hush(3);
@@ -1591,7 +1654,6 @@ export default class Level19 extends LevelBase {
     const f = this._approachFloor, door = this._fireDoors[f], st = this._stub[f];
     this.playSound('unlock');
     door.setOpen(true, 1);
-    this.removeBlocker(this._stubBlockers[f]);
     this.playSound('door');
     st.on = true;
     st.light.intensity = 4;
@@ -1602,11 +1664,18 @@ export default class Level19 extends LevelBase {
       every: 0.45,
       opts: { soft: true },
       onStep: (i, pos) => { this._wMesh.position.copy(pos); this._wMesh.faceToward(to); },
-      onDone: () => { this._wMesh.visible = false; },
+      // The walk away takes four and a half seconds, and nothing but these two
+      // blockers stands between you and it while it lasts — a run up the last
+      // two steps closes the two metres in a fifth of a second. You are held
+      // where you stopped until it is gone, and then the stairs are yours.
+      onDone: () => {
+        this._wMesh.visible = false;
+        this.removeBlocker(this._approachBlocker);
+        this.removeBlocker(this._stubBlockers[f]);
+      },
     });
     this.cue('small footsteps, going away', from);
     this.subtitle('The door beside it gives, and it goes through, and does not look back. You did not want it to.', 6);
-    this.removeBlocker(this._approachBlocker);
     this.setObjective('up. the back of the wardrobe.');
   }
 
