@@ -74,6 +74,7 @@ export default class Level16 extends LevelBase {
     this._listRead = false;
     this._visitedEvening = false;
     this._tapPlayedAtNight = false;
+    this._hummedOnce = false;
     this._overheadArmed = false;
     this._wasChanging = false;
 
@@ -84,6 +85,9 @@ export default class Level16 extends LevelBase {
     this._bindLook({ x: -3.55, y: 1.7, z: -0.6 }, { x: -9, y: 6, z: -2 });
     this._wirePuzzle();
 
+    // spec §5.1 spawns at (2.3, 1.2); stood back from the fridge, whose door swings
+    // across that spot at the morning and fills the frame. Same yaw, and the clock is
+    // still ahead and to the right, over the hall door.
     this.spawn.position.set(2.1, 0, -0.2);
     this.spawn.yaw = Math.PI / 2;                          // facing −X into the room
     this.bounds = new THREE.Box3(new THREE.Vector3(-2.9, 0, -4.4), new THREE.Vector3(2.9, 3, 2.2));
@@ -922,18 +926,25 @@ export default class Level16 extends LevelBase {
     this._visitedEvening = true;
     this._eveningRadio = this.loopAt('radio', { x: 0.3, y: 1.2, z: -3.2 });
     this._eveningRadio.setGain(0.5);                       // faint, through the hatch
-    if (this._eveningOnce) return;
-    this._eveningOnce = true;
-    this._tap = this.loopAt('tap', this._tapPos);
-    this.after(12, () => {
-      this._stopTap(0.8);
-      this.after(5, () => {
-        if (!this.hours.is('evening')) return;
-        this.playSoundAt('hummed', { x: -1.5, y: 1.5, z: -2.8 }, { notes: HUM });
-        this.cue('humming, beyond the door', new THREE.Vector3(-1.5, 1.5, -2.8));
-        for (let i = 0; i < 3; i++) this.after(2.4 + i * 0.9, () => this.playSoundAt('stepOther', { x: -1.5, y: 0, z: -3.2 - i * 0.8 }, { soft: true }));
-      });
-    });
+    if (!this._eveningOnce) {
+      this._eveningOnce = true;
+      this._tap = this.loopAt('tap', this._tapPos);
+      this.after(12, () => { this._stopTap(0.8); this.after(5, () => this._humBeyondTheDoor()); });
+      return;
+    }
+    // she runs the tap only the once, but the humming is owed until you stay for it
+    if (!this._hummedOnce) this.after(5, () => this._humBeyondTheDoor());
+  }
+
+  /** Her humming beyond the hall door and three steps going away — the evening's one beat. */
+  _humBeyondTheDoor() {
+    if (this._hummedOnce || !this.hours.is('evening')) return;
+    this._hummedOnce = true;
+    this.playSoundAt('hummed', { x: -1.5, y: 1.5, z: -2.8 }, { notes: HUM });
+    this.cue('humming, beyond the door', new THREE.Vector3(-1.5, 1.5, -2.8));
+    for (let i = 0; i < 3; i++) {
+      this.after(2.4 + i * 0.9, () => { if (this.hours.is('evening')) this.playSoundAt('stepOther', { x: -1.5, y: 0, z: -3.2 - i * 0.8 }, { soft: true }); });
+    }
   }
 
   _enterNight() {
@@ -973,8 +984,10 @@ export default class Level16 extends LevelBase {
     this.playSound('switch');
     const k = SWITCH_ORDER[i];
     if (!this.hours.is('night')) {
-      this._switches[i].rotation.z = -this._switches[i].rotation.z;
-      this.after(0.5, () => { this._switches[i].rotation.z = -0.35; });
+      // she puts it back where the night left it, so a lever never says off over a lit lamp
+      const rest = () => (this._on[k] ? 0.35 : -0.35);
+      this._switches[i].rotation.z = -rest();
+      this.after(0.5, () => { this._switches[i].rotation.z = rest(); });
       this.subtitle('She\'d only put it back. Leave them for the night.', 4);
       return;
     }
