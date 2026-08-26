@@ -4,7 +4,7 @@ Read `src/levels/Level01.js` first; it is the canonical example of everything be
 
 ## The game
 
-First-person dreamcore puzzle game. Fifteen levels ("rooms"), each a distorted
+First-person dreamcore puzzle game. Twenty levels ("rooms"), each a distorted
 memory: liminal, softly eerie, quietly sad — never horror, never jump-scares.
 Nothing chases the player. The dread is ambient; the sadness is textual.
 Visual style: realistic-leaning (PBR materials, fog, warm/cold light pools),
@@ -17,7 +17,7 @@ Create exactly one file `src/levels/LevelNN.js` (two digits). It must
 
 ```js
 static meta = {
-  id: N,                    // level number, 1..15
+  id: N,                    // level number, 1..20
   numeral: 'IV',            // roman numeral
   title: 'The Something',   // shown on the title card
   mood: 'pool',             // ambience key, see Audio below
@@ -30,7 +30,8 @@ static meta = {
 
 Levels are auto-discovered by filename — never edit `src/levels/index.js`
 or any shared file. Import only from `three`, `../core/LevelBase.js`,
-`../core/textures.js`, `../core/props.js`, `../core/presence.js`.
+`../core/textures.js`, `../core/props.js`, `../core/presence.js`,
+`../core/hours.js`.
 
 ## Lifecycle
 
@@ -133,7 +134,7 @@ Also: `textTexture({text, font, color, bg, width, height})` for canvas text,
 ## Audio
 
 `mood` keys: `hallway pool dusk store home field train theater archive shore
-night stairwell school playground under`.
+night stairwell school playground under evening morning`.
 
 One-shots: `this.playSound(name, opts)` (everywhere) or
 `this.playSoundAt(name, {x,y,z}, opts)` (from a place — HRTF panned,
@@ -142,18 +143,19 @@ distance-attenuated). `sfxAt`/`playSoundAt` tears its panner down after
 that — many `knock` counts, a long `musicbox`, `phone` with several rings —
 must pass a matching `holdSeconds` or its tail is silently dropped.
 Names: `step paper pickup clue unlock locked wrong switch door splash
-complete tone`
-`knock {count=3,gap=0.42,soft} stepOther {soft} breath whisper phone {rings}
+complete tone tick gasp lock`
+`knock {count=3,gap=0.42,soft} stepOther {soft} smallStep {soft} breath
+whisper wind {clicks=9, gap=0.07} phone {rings}
 musicbox {notes,step,gain,slow} chime static {dur} slam tinnitus reverse
 {dur} toll heartbeat {beats} handle clunk piano {freq,gain} hummed
-{notes,step,gain}`.
+{notes,step,gain,small}`.
 `tone` takes `{freq, gain, decay}`. Note frequencies: `LevelBase.NOTES.E`
 etc.; `LevelBase.tune('EGAGEGE')` → an array of Hz.
 
 Loops: `const h = this.loopAt(kind, {x,y,z}, opts)` →
 `{ stop(fadeSeconds), setPosition(pos), setGain(g) }`; kinds `tap radio
-boiler hum swing rain pianoKey {freq, every}`. Loops stop by themselves
-when the room is disposed.
+boiler hum swing rain pianoKey {freq, every} birds idle fire simmer`. Loops
+stop by themselves when the room is disposed.
 
 Mood shaping: `this.dread(0..1)` darkens the drone and adds a sub pulse
 (reset on room change); `this.hush(seconds, depth=1)` cuts the ambience
@@ -195,6 +197,43 @@ at a distance or behind you. The figure is never lit and has no face.
 Silence (`hush`) is the strongest cue. Every scare is followed by
 something that lets go. Every hearing-dependent step has a sighted
 fallback (a light, dust, a written redundancy) and a `cue()`.
+
+## The hours, the child, a walk you hear (rooms XVI–XX)
+
+- `import { Hours } from '../core/hours.js'` — a room that exists at three
+  hours. `const hours = new Hours(this, { order: ['night','morning','evening'], initial: 'night', fade: 1.6, blink: 140, onChange })`;
+  `hours.bind(hour, { objects, interact, lights: [{ light, intensity }], colliders, blockers, fog: { color, near, far }, grade, mood, loops: [{ kind, position, opts }], onEnter, onLeave })`
+  (specs accumulate; an object bound anywhere is hidden at the hours it is
+  not bound to; a light bound anywhere is driven to 0 at the others);
+  `hours.start()` at the end of `build()`, then `this.track(hours)`;
+  `hours.set(hour)` / `hours.next()` crossfade lights, fog and grade over
+  `fade` seconds and swap everything else under a `flash()` blink at the
+  midpoint; `hours.current`, `hours.changing`, `hours.is(hour)`. Keep the
+  instance at `this.hours` (the screenshot tool's `--hour` flag uses it).
+  The room plays the `wind` sound and turns its clock's hands itself.
+- `makeClockFace({ radius, face, hands })` (props) → a face facing +Z with
+  `.setTime(h, m, animate = 1.6)` and `.update(dt)` (track it). Wrap it in a
+  case.
+- `makeChild({ height = 1.12 })` (presence) → someone small: lit, warm grey,
+  casts shadows, no face; `child.torch` (a SpotLight along its front),
+  `child.setTorch(on)`, `child.faceToward(p)`, `child.setHeight(h)`.
+- `this.isSeenBy(obj, { angleDeg = 30, maxDist = 8, occluders, eye })` — is
+  the camera inside `obj`'s forward cone (its local +Z)? The mirror of
+  `isSeen`. `eye` is a world-units offset for the object's eyes.
+- `this.footsteps(points, { stride = 0.55, every = 0.5, sound = 'smallStep', opts, onStep, onDone })`
+  — a walk you hear along a polyline; returns `cancel()`.
+- `this.setMood(key)` — change the ambience mid-room (the hours do it).
+
+### Rooms XVI–XX: the other side
+
+The five above keep every rule of the five beneath and add six: the child
+and the player are never closer than about two metres to each other; the
+child is lit, small and faceless and never speaks (it hums, gasps,
+breathes, turns over); the player is shown as the figure only once, in the
+glass in XX; being seen by the child costs progress, never a room; the
+morning hour is sad, never frightening; she is never seen at the evening
+hour — warmth, sound and things just set down are all she is. Doors onward
+open at 3:07 only; what you put down at another hour does not stay.
 
 ## Playtest hook — debugSolve() (required, enforced by CI)
 

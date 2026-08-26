@@ -17,20 +17,22 @@ try {
     const failed = [];
     const names = ['step', 'paper', 'pickup', 'clue', 'unlock', 'locked', 'wrong', 'switch', 'door', 'splash',
       'complete', 'tone', 'knock', 'stepOther', 'breath', 'whisper', 'phone', 'musicbox', 'chime', 'static',
-      'slam', 'tinnitus', 'reverse', 'toll', 'heartbeat', 'handle', 'clunk', 'piano', 'hummed'];
+      'slam', 'tinnitus', 'reverse', 'toll', 'heartbeat', 'handle', 'clunk', 'piano', 'hummed',
+      'wind', 'smallStep', 'tick', 'gasp', 'lock'];
     for (const n of names) {
       try {
         a.sfx(n, { notes: [329.63, 392], count: 2, rings: 1, freq: 440 });
         a.sfxAt(n, { x: 1, y: 1, z: -2 }, { notes: [329.63], count: 1 });
       } catch (e) { failed.push(`${n}: ${e.message}`); }
     }
-    for (const k of ['tap', 'radio', 'boiler', 'hum', 'swing', 'rain', 'pianoKey']) {
+    try { a.sfxAt('hummed', { x: 0, y: 1, z: -1 }, { notes: [329.63, 392], small: true }); } catch (e) { failed.push(`hummed small: ${e.message}`); }
+    for (const k of ['tap', 'radio', 'boiler', 'hum', 'swing', 'rain', 'pianoKey', 'birds', 'idle', 'fire', 'simmer']) {
       try {
         const h = a.loopAt(k, { x: 0, y: 2, z: 0 }, { freq: 329.63, every: 1 });
         h.setPosition({ x: 1, y: 1, z: 1 }); h.setGain(0.5); h.stop(0.1);
       } catch (e) { failed.push(`loop ${k}: ${e.message}`); }
     }
-    for (const m of ['night', 'stairwell', 'school', 'playground', 'under', 'hallway']) {
+    for (const m of ['night', 'stairwell', 'school', 'playground', 'under', 'hallway', 'evening', 'morning']) {
       try { a.setAmbience(m); a.setDread(0.7); a.hush(1); a.setDread(0); } catch (e) { failed.push(`mood ${m}: ${e.message}`); }
     }
     try { a.updateListener(window.__game.engine.camera); } catch (e) { failed.push(`listener: ${e.message}`); }

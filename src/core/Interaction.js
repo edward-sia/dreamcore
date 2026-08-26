@@ -27,13 +27,16 @@ export class Interaction {
       onInteract: opts.onInteract,
       once: opts.once ?? false,
       enabled: opts.enabled ?? true,
+      spent: false,
       distance: opts.distance ?? MAX_DIST,
     });
   }
 
   setEnabled(object, on) {
+    // `once` means once per room: something that enables a whole list at a
+    // time (the hours) must not hand a spent one-shot back to the player.
     const it = this._items.get(object);
-    if (it) it.enabled = on;
+    if (it) it.enabled = on && !it.spent;
   }
 
   setPrompt(object, prompt) {
@@ -55,7 +58,7 @@ export class Interaction {
   triggerObject(object) {
     const it = this._items.get(object);
     if (!it || !it.enabled) return false;
-    if (it.once) it.enabled = false;
+    if (it.once) { it.enabled = false; it.spent = true; }
     it.onInteract?.(object);
     return true;
   }
@@ -94,7 +97,7 @@ export class Interaction {
     const obj = this.current;
     const it = this._items.get(obj);
     if (!it || !it.enabled) return;
-    if (it.once) it.enabled = false;
+    if (it.once) { it.enabled = false; it.spent = true; }
     this.ui.setPrompt(null);
     this.current = null;
     it.onInteract?.(obj);

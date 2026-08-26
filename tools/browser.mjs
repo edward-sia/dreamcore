@@ -45,8 +45,11 @@ if (!EXECUTABLE) {
 }
 
 export async function launch({ port = 5199 } = {}) {
+  // No HMR and no file watcher: a run must not reload the page because
+  // something edited src/ while it was in flight (that reload destroys the
+  // page context mid-test and reads as a room failure).
   const server = await createServer({
-    server: { port, host: '127.0.0.1', strictPort: true },
+    server: { port, host: '127.0.0.1', strictPort: true, hmr: false, watch: null },
     logLevel: 'silent',
   });
   await server.listen();

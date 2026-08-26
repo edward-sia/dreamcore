@@ -119,12 +119,12 @@ async function startLevel(id, { skipCard = false } = {}) {
   // there is no ambience, and setAmbience resets dread to 0 — so a room that
   // opens with this.dread(...) only keeps it if its ambience is already up.
   audio.setAmbience(meta.mood);
+  ui.setObjective('');            // clear the last room's line before this one's build() writes its own
   currentLevel = new LevelClass(game);
   currentLevel.init();
   engine.setScene(currentLevel.scene);
   player.spawnAt(currentLevel.spawn.position, currentLevel.spawn.yaw);
   ui.showHUD(true);
-  ui.setObjective('');
 
   if (!skipCard && !window.__TEST_MODE__) {
     await ui.showTitleCard(meta.numeral, meta.title);
@@ -172,7 +172,7 @@ game.onLevelComplete = async () => {
     await startLevel(nextId);
   } else {
     await ui.showInterlude(EPILOGUE);
-    await ui.showInterlude('H I R A E T H\n\na dream in fifteen rooms\n\nthank you for staying asleep with me');
+    await ui.showInterlude('H I R A E T H\n\na dream in twenty rooms\n\nthank you for leaving the light on');
     await exitToMenu();
   }
 };
@@ -212,9 +212,12 @@ leaderboard.attach();
 function buildMenu() {
   const anyProgress = save.data.completed.length > 0 || save.data.unlocked > 1;
   document.getElementById('btn-continue').disabled = !anyProgress;
-  document.getElementById('menu-sub').textContent = save.data.completed.includes(10)
-    ? 'a dream in ten rooms · and the five beneath'
-    : 'a dream in ten rooms';
+  const done = save.data.completed;
+  document.getElementById('menu-sub').textContent = done.includes(15)
+    ? 'a dream in ten rooms · the five beneath · the five above'
+    : done.includes(10)
+      ? 'a dream in ten rooms · and the five beneath'
+      : 'a dream in ten rooms';
   document.getElementById('set-captions').checked = save.data.captions;
 
   levelsGrid.innerHTML = '';

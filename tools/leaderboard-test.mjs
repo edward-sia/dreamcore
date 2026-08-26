@@ -76,11 +76,16 @@ try {
   const dara = r.entries.find((e) => e.name.startsWith('da'));
   check('name stripped and collapsed', dara && dara.name === 'dara the quiet', JSON.stringify(dara?.name));
 
+  // rooms up to 20 are accepted (the cap was 10 until the five above)
+  r = await (await post({ key: 'fay-6666-ffff', name: 'fay', times: { 20: 300 } })).json();
+  check('room 20 accepted', r.ok === true && r.levels === 1, JSON.stringify(r));
+
   // rejections
   const bad = [
     ['short key', { key: 'x', name: 'x', times: { 1: 60 } }],
     ['empty name', { key: 'eee-5555-eeee', name: ' ​ ', times: { 1: 60 } }],
     ['room out of range', { key: 'eee-5555-eeee', name: 'e', times: { 99: 60 } }],
+    ['room 21', { key: 'eee-5555-eeee', name: 'e', times: { 21: 60 } }],
     ['non-numeric time', { key: 'eee-5555-eeee', name: 'e', times: { 1: 'fast' } }],
     ['absurd time', { key: 'eee-5555-eeee', name: 'e', times: { 1: 1e9 } }],
     ['sub-second time', { key: 'eee-5555-eeee', name: 'e', times: { 1: 0.2 } }],
@@ -109,7 +114,13 @@ try {
   console.error('  FAIL — unexpected error:', err.message);
 }
 
-child?.kill('SIGTERM');
+// Wait for the server to exit before removing its data dir: it flushes the
+// store on SIGTERM, and deleting under it made the run fail after the checks.
+if (child) {
+  const exited = new Promise((r) => child.once('exit', r));
+  child.kill('SIGTERM');
+  await Promise.race([exited, new Promise((r) => setTimeout(r, 3000))]);
+}
 if (dataDir) rmSync(dataDir, { recursive: true, force: true });
 console.log(failures ? `\n${failures} failure(s)` : '\nall leaderboard checks passed');
 process.exit(failures ? 1 : 0);

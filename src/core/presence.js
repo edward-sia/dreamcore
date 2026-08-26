@@ -31,6 +31,51 @@ export function makeFigure({ height = 1.95 } = {}) {
 }
 
 /**
+ * Someone small: the figure's primitives at child height, but lit — a warm
+ * grey, casting shadows, no face — with a torch on its brow that points
+ * along its front (local +Z). Rooms animate it; update() is a no-op so
+ * level.track(child) is harmless.
+ */
+export function makeChild({ height = 1.12 } = {}) {
+  const g = new THREE.Group();
+  const k = height / 1.12;
+  const mat = new THREE.MeshStandardMaterial({ color: 0x9a8c80, roughness: 0.9, metalness: 0 });
+  const legs = new THREE.Mesh(new THREE.CylinderGeometry(0.09 * k, 0.08 * k, height * 0.22, 8), mat);
+  legs.position.y = height * 0.11;
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.11 * k, 0.13 * k, height * 0.42, 10), mat);
+  body.position.y = height * 0.43;
+  const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.14 * k, 10, 8), mat);
+  shoulders.scale.set(1, 0.45, 0.7);
+  shoulders.position.y = height * 0.66;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.085 * k, 12, 10), mat);
+  head.position.y = height * 0.9;
+  g.add(legs, body, shoulders, head);
+  g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
+
+  const torch = new THREE.SpotLight(0xffe7b8, 0, 11, 0.36, 0.55, 1.4);
+  torch.position.set(0, 0.78 * height, 0.12);
+  const target = new THREE.Object3D();
+  target.position.set(0, 0.6 * height, 4);
+  g.add(target);
+  torch.target = target;
+  const lens = new THREE.Mesh(
+    new THREE.SphereGeometry(0.02, 8, 6),
+    new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0xffe7b8, emissiveIntensity: 0 })
+  );
+  lens.position.copy(torch.position);
+  lens.castShadow = false;
+  g.add(torch, lens);
+  g._lens = lens;
+  g.torch = torch;
+  g.setTorch = (on) => { torch.intensity = on ? 6 : 0; lens.material.emissiveIntensity = on ? 2.5 : 0; };
+  g.faceToward = (p) => { g.rotation.y = Math.atan2(p.x - g.position.x, p.z - g.position.z); };
+  g.setHeight = (h) => { g.scale.setScalar(h / height); };
+  g.update = () => {};
+  g.userData.isChild = true;
+  return g;
+}
+
+/**
  * Moves a figure between fixed stations, one hop per `minUnseen` seconds of
  * not being looked at. Register with level.track(presence).
  */

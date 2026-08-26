@@ -264,6 +264,66 @@ export function makeSign({
   return m;
 }
 
+/**
+ * A clock face: a disc with twelve ticks and two hands, facing +Z.
+ * clock.setTime(h, m, animate) turns the hands (clockwise, the short way
+ * forward) over `animate` seconds; register with level.track(clock).
+ * Rooms wrap it in a case.
+ */
+export function makeClockFace({ radius = 0.16, face = '#e8e2d3', hands = '#2a2622' } = {}) {
+  const g = new THREE.Group();
+  const disc = new THREE.Mesh(
+    new THREE.CircleGeometry(radius, 32),
+    new THREE.MeshStandardMaterial({ color: face, emissive: face, emissiveIntensity: 0.12, roughness: 0.6 })
+  );
+  g.add(disc);
+  const dark = new THREE.MeshStandardMaterial({ color: hands, roughness: 0.6 });
+  for (let i = 0; i < 12; i++) {
+    const tick = new THREE.Mesh(new THREE.BoxGeometry(radius * 0.04, radius * 0.12, 0.004), dark);
+    const a = (i / 12) * Math.PI * 2;
+    tick.position.set(Math.sin(a) * radius * 0.86, Math.cos(a) * radius * 0.86, 0.003);
+    tick.rotation.z = -a;
+    g.add(tick);
+  }
+  const hand = (len, w) => {
+    const pivot = new THREE.Group();
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, len, 0.004), dark);
+    m.position.y = len / 2 - w;
+    pivot.add(m);
+    pivot.position.z = 0.006;
+    g.add(pivot);
+    return pivot;
+  };
+  const hour = hand(radius * 0.55, radius * 0.07);
+  const minute = hand(radius * 0.85, radius * 0.05);
+  g._hour = hour; g._minute = minute;
+
+  let ah = 0, am = 0;                 // current angles, clockwise from 12
+  let fh = 0, fm = 0, th = 0, tm = 0; // from / to
+  let animT = 0, animDur = 0;
+  const apply = () => { hour.rotation.z = -ah; minute.rotation.z = -am; };
+  const forward = (a, b, e) => { let d = b - a; while (d < 0) d += Math.PI * 2; return a + d * e; };
+  g.setTime = (h, m, animate = 1.6) => {
+    fh = ah; fm = am;
+    th = (((h % 12) + m / 60) / 12) * Math.PI * 2;
+    tm = (m / 60) * Math.PI * 2;
+    animDur = Math.max(0, animate); animT = 0;
+    if (animDur === 0) { ah = th; am = tm; apply(); }
+  };
+  g.update = (dt) => {
+    if (animT >= animDur) return;
+    animT = Math.min(animDur, animT + dt);
+    const k = animDur ? animT / animDur : 1;
+    const e = 1 - Math.pow(1 - k, 3);
+    ah = forward(fh, th, e);
+    am = forward(fm, tm, e);
+    if (k >= 1) { ah = th; am = tm; }
+    apply();
+  };
+  apply();
+  return g;
+}
+
 /** Framed picture with any texture (use textTexture or a small drawn canvas). */
 export function makePictureFrame({ texture, width = 0.5, height = 0.38 } = {}) {
   const g = new THREE.Group();

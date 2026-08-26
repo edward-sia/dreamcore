@@ -1,14 +1,16 @@
 # HIRAETH
 
-*a dream in ten rooms — and, once you’ve woken, five more*
+*a dream in ten rooms — and, once you’ve woken, five more — and five after*
 
 A first-person dreamcore puzzle game. You drift through ten half-remembered
 places — a corridor that grew too long, a pool under the house, a supermarket
 an hour after closing — looking for the clues each room hides, unlocking your
 way deeper toward waking. And then, past the shore, the five rooms
 beneath: you open your eyes at 3:07 and the door is shut. Something
-follows you down. It never touches you. Slightly eerie, slightly sad.
-Nothing here will hurt you.
+follows you down. It never touches you. Years later the house comes back
+once more — not for you — and the last five rooms put you on the other side
+of every door, at three hours of the same night. Slightly eerie, slightly
+sad. Nothing here will hurt you.
 
 > **hiraeth** *(Welsh)* — homesickness for a home you cannot return to,
 > or that never was.
@@ -43,6 +45,11 @@ rooms that came before.
 Rooms XI–XV misdirect you — plates lie, things move when you look away —
 and ask you to listen: sounds have places now. Headphones matter here.
 Turn on **describe sounds** in settings for captions with directions.
+
+Rooms XVI–XX exist at three hours — her evening, 3:07, and the morning the
+house is emptied — and this time you leave the clues instead of finding
+them. The clock in each room moves you between hours; only the night
+counts.
 
 ## The dreamers — leaderboard
 
@@ -97,7 +104,7 @@ setups are described in [`docs/HOSTING.md`](docs/HOSTING.md).
 - **Engine:** `src/core/` — first-person controller with pointer lock and
   AABB collision, raycast interaction, notes/journal/keypad UI, ambience
   engine, save system.
-- **Levels:** `src/levels/Level01.js … Level15.js`, auto-discovered. The
+- **Levels:** `src/levels/Level01.js … Level20.js`, auto-discovered. The
   authoring contract lives in [`docs/LEVEL_API.md`](docs/LEVEL_API.md);
   the room-by-room design bible (all puzzles spoiled) is
   [`docs/DESIGN.md`](docs/DESIGN.md).
@@ -108,6 +115,7 @@ Levels are verified headless (Chromium + software WebGL):
 
 ```bash
 npm run shot -- 3          # screenshot level 3 from four angles → shots/
+npm run shot -- 18 --hour morning   # rooms XVI–XX also render at their other hours
 npm run playtest           # prove every level is solvable end-to-end
 npm run playtest -- 7      # just level 7
 npm run test:api           # leaderboard server contract tests

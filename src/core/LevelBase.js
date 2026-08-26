@@ -194,6 +194,45 @@ export class LevelBase {
 
   playSoundAt(name, position, opts) { this.game.audio.sfxAt?.(name, position, opts); }
 
+  /**
+   * A walk you hear: one positional `sound` every `every` seconds, `stride`
+   * metres apart along the polyline `points` ([{x,y,z}, …]). Steps are
+   * `after()` timeouts, so dispose() clears them. Returns cancel().
+   */
+  footsteps(points, { stride = 0.55, every = 0.5, sound = 'smallStep', opts = {}, onStep = null, onDone = null } = {}) {
+    const pts = points.map((p) => new THREE.Vector3(p.x, p.y ?? 0, p.z));
+    const segs = [];
+    let total = 0;
+    for (let i = 1; i < pts.length; i++) { const l = pts[i].distanceTo(pts[i - 1]); segs.push(l); total += l; }
+    const at = (d) => {
+      let acc = 0;
+      for (let i = 0; i < segs.length; i++) {
+        if (d <= acc + segs[i] || i === segs.length - 1) {
+          const k = segs[i] > 0 ? Math.min(1, Math.max(0, (d - acc) / segs[i])) : 0;
+          return new THREE.Vector3().lerpVectors(pts[i], pts[i + 1], k);
+        }
+        acc += segs[i];
+      }
+      return pts[pts.length - 1].clone();
+    };
+    const n = Math.floor(total / stride) + 1;
+    const ids = [];
+    let cancelled = false;
+    for (let i = 0; i < n; i++) {
+      ids.push(this.after(i * every, () => {
+        if (cancelled) return;
+        const pos = at(Math.min(total, i * stride));
+        this.playSoundAt(sound, pos, opts);
+        onStep?.(i, pos);
+        if (i === n - 1) onDone?.();
+      }));
+    }
+    return () => {
+      cancelled = true;
+      for (const id of ids) { clearTimeout(id); this._timeouts.delete(id); }
+    };
+  }
+
   /** A sustained positional sound; stopped automatically when the level is disposed. */
   loopAt(kind, position, opts) {
     const h = this.game.audio.loopAt(kind, position, opts);
@@ -204,6 +243,9 @@ export class LevelBase {
   dread(v) { this.game.audio.setDread?.(v); }
 
   hush(seconds, depth) { this.game.audio.hush?.(seconds, depth); }
+
+  /** Change the ambience mid-room (the hours use it). */
+  setMood(key) { this.game.audio.setAmbience?.(key); }
 
   /** A one-blink post-process spike; `flash` > 0 also blacks the screen for that many ms. */
   flinch({ grain = 0.3, fringe = 0.008, desat = 0.6, duration = 0.35, flash = 0 } = {}) {
@@ -227,6 +269,31 @@ export class LevelBase {
     if (_f.dot(_d) < Math.cos(angleDeg * Math.PI / 180)) return false;
     if (occluders && occluders.length) {
       _ray.set(_c, _d);
+      _ray.far = Math.max(0, dist - 0.05);
+      if (_ray.intersectObjects(occluders, true).length) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Is the camera inside `obj`'s forward cone (its local +Z — the front of a
+   * figure or a child)? `eye` is a world-units offset added to obj's position
+   * (a child's eyes are about 0.95 m up). The mirror of isSeen.
+   */
+  isSeenBy(obj, { angleDeg = 30, maxDist = 8, occluders = null, eye = null } = {}) {
+    const cam = this.game.engine.camera;
+    obj.getWorldPosition(_p);
+    if (eye) _p.add(eye);
+    cam.getWorldPosition(_c);
+    _d.subVectors(_c, _p);
+    const dist = _d.length();
+    if (dist > maxDist) return false;
+    if (dist < 1e-6) return true;
+    _d.divideScalar(dist);
+    obj.getWorldDirection(_f);
+    if (_f.dot(_d) < Math.cos(angleDeg * Math.PI / 180)) return false;
+    if (occluders && occluders.length) {
+      _ray.set(_p, _d);
       _ray.far = Math.max(0, dist - 0.05);
       if (_ray.intersectObjects(occluders, true).length) return false;
     }
