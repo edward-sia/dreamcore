@@ -80,6 +80,18 @@ const frames = async (n) => {
 };
 
 try {
+  // Headless Chromium refuses pointer lock outright, so `pointerLockElement`
+  // is null whatever the game does. Count the calls instead: spec §2 says a
+  // touch-mode session never asks for one.
+  await page.addInitScript(() => {
+    window.__lockCalls = 0;
+    const real = Element.prototype.requestPointerLock;
+    Element.prototype.requestPointerLock = function (...a) {
+      window.__lockCalls++;
+      return real.apply(this, a);
+    };
+  });
+
   // Boot without ?test=1 — fades run for real, so allow time.
   await page.goto(`${url}/?level=1`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__game?.playing === true, null, { timeout: 40000 });
@@ -95,11 +107,11 @@ try {
     body: document.body.classList.contains('touch'),
     hud: !document.getElementById('touch-hud').classList.contains('hidden'),
     touchMode: window.__game.player.touchMode,
-    locked: document.pointerLockElement !== null,
+    lockCalls: window.__lockCalls,
     dpr: window.__game.engine.renderer.getPixelRatio(),
   }));
   check('a coarse pointer boots straight into touch mode',
-    boot.coarse && boot.body && boot.hud && boot.touchMode && !boot.locked,
+    boot.coarse && boot.body && boot.hud && boot.touchMode && boot.lockCalls === 0,
     JSON.stringify(boot));
   check('pixel ratio is capped at 1.5 on a coarse pointer', boot.dpr <= 1.5, `dpr ${boot.dpr}`);
 
@@ -202,20 +214,34 @@ try {
   await modalIs(null);
   check('a tap puts the note down', true);
 
+  // 7b. A tap that lands on nothing does nothing (spec §3.4): it was just a
+  //     look that never moved. Every other tap here is at the crosshair, where
+  //     the raycast cannot miss.
+  await at(-0.3, -3.2, 0.72, -0.66);
+  await gazeIs('read the note');
+  await gesture(page, { x: 760, y: 60 }, { x: 760, y: 60 }, { steps: 0 });
+  await frames(4);
+  check('a tap away from the thing does nothing', await page.evaluate(() =>
+    window.__game.ui.modalKind === null && window.__game.interaction.current !== null));
+
   // 8. The word-pill: face the first right-hand door at (1.33, 0, -5), then tap
   //    the pill and watch the trigger fire.
   await at(0.2, -5, -Math.PI / 2, 0);
   await gazeIs('try the door');
-  const fired = await page.evaluate(() => {
+  await page.evaluate(() => {
     const it = window.__game.interaction;
-    let hit = null;
+    window.__pillHit = null;
     const real = Object.getPrototypeOf(it).trigger;
-    it.trigger = function (...a) { hit = this.current; return real.apply(this, a); };
-    document.getElementById('prompt').click();
-    delete it.trigger;
-    return hit === null ? 'nothing fired' : hit === window.__game.level._doorTried ? 'ok' : 'ok';
+    it.trigger = function (...a) { window.__pillHit = this.current; return real.apply(this, a); };
   });
-  check('the word-pill fires the trigger', fired === 'ok', String(fired));
+  let tapped = true;
+  try { await page.tap('#prompt', { timeout: 8000 }); } catch { tapped = false; }
+  const hit = await page.evaluate(() => {
+    delete window.__game.interaction.trigger;
+    return window.__pillHit !== null;
+  });
+  check('the word-pill takes a tap and fires the trigger', tapped && hit,
+    tapped ? 'the tap fired nothing' : 'the pill would not take the tap');
 
   // 9. The corner words: *remember* opens the journal, a backdrop tap closes it,
   //    *surface* opens the pause overlay (spec §3.5).
@@ -232,7 +258,7 @@ try {
   await page.tap('#btn-resume');
   await until(() => document.getElementById('pause').classList.contains('hidden'));
   check('“sink back” resumes, and takes no pointer lock', await page.evaluate(() =>
-    window.__game.player.frozen === false && document.pointerLockElement === null));
+    window.__game.player.frozen === false && window.__lockCalls === 0));
 
   // 10. Portrait holds the room and stops its timer (spec §5.3).
   await page.setViewportSize({ width: VIEW.height, height: VIEW.width });
@@ -268,6 +294,16 @@ try {
   await fine.waitForFunction(() => !!window.__game, null, { timeout: 40000 });
   check('a fine pointer does not enter touch mode by itself', await fine.evaluate(() =>
     !matchMedia('(pointer: coarse)').matches && !document.body.classList.contains('touch')));
+  // A finger somewhere that is not the room — the menu, an overlay — is not
+  // someone playing by touch, and touch mode is a one-way trip (spec §2).
+  await fine.evaluate(() => {
+    const el = document.getElementById('hud');
+    const t = new Touch({ identifier: 31, target: el, clientX: 400, clientY: 200 });
+    el.dispatchEvent(new TouchEvent('touchstart', { touches: [t], changedTouches: [t], bubbles: true, cancelable: true }));
+  });
+  await fine.waitForTimeout(150);
+  check('a touch outside the room does not enter touch mode',
+    await fine.evaluate(() => !document.body.classList.contains('touch')));
   await gesture(fine, { x: 700, y: 200 });
   await fine.waitForFunction(() => document.body.classList.contains('touch'), null, { timeout: 10000 });
   check('the first touch enters touch mode anyway', await fine.evaluate(() =>

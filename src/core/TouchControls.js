@@ -1,5 +1,5 @@
 import {
-  stickVector, lookDelta, isTap, HurryGate, STICK_RADIUS,
+  stickVector, lookDelta, isTap, HurryGate, STICK_RADIUS, TAP_MAX_TRAVEL,
 } from './touchmath.js';
 
 const STICK_ZONE = 0.45; // left fraction of the screen that births the stick
@@ -53,6 +53,25 @@ export class TouchControls {
     this._ring.classList.remove('driving');
   }
 
+  /** In the walk zone: the stick is born where the thumb is. */
+  _birthStick(t) {
+    this._stick = { id: t.identifier, ox: t.clientX, oy: t.clientY, dx: 0, dy: 0 };
+    this._ring.style.left = `${t.clientX}px`;
+    this._ring.style.top = `${t.clientY}px`;
+    this._pebble.style.transform = 'translate(0px, 0px)';
+    this._ring.classList.remove('hidden', 'driving');
+  }
+
+  /** In the look zone: `travel` starts spent when the touch was adopted late,
+   *  so a finger picked up mid-drag can never read as a tap. */
+  _birthLook(t, travel = 0) {
+    this._look = {
+      id: t.identifier, x: t.clientX, y: t.clientY,
+      startX: t.clientX, startY: t.clientY,
+      startT: performance.now(), travel,
+    };
+  }
+
   _start(e) {
     if (this.ui.modalOpen || this.player.frozen) return;
     e.preventDefault();
@@ -60,24 +79,16 @@ export class TouchControls {
       // Which zone the touch lands in decides what it is — a second finger in
       // the walk zone is not a look drag, it is a finger the stick already has.
       if (t.clientX < window.innerWidth * STICK_ZONE) {
-        if (this._stick) continue;
-        this._stick = { id: t.identifier, ox: t.clientX, oy: t.clientY, dx: 0, dy: 0 };
-        this._ring.style.left = `${t.clientX}px`;
-        this._ring.style.top = `${t.clientY}px`;
-        this._pebble.style.transform = 'translate(0px, 0px)';
-        this._ring.classList.remove('hidden', 'driving');
+        if (!this._stick) this._birthStick(t);
       } else if (!this._look) {
-        this._look = {
-          id: t.identifier, x: t.clientX, y: t.clientY,
-          startX: t.clientX, startY: t.clientY,
-          startT: performance.now(), travel: 0,
-        };
+        this._birthLook(t);
       }
     }
   }
 
   _move(e) {
     e.preventDefault();
+    if (this.ui.modalOpen || this.player.frozen) return;
     for (const t of e.changedTouches) {
       if (this._stick && t.identifier === this._stick.id) {
         const dx = t.clientX - this._stick.ox;
@@ -97,6 +108,14 @@ export class TouchControls {
         this._look.y = t.clientY;
         const d = lookDelta(dx, dy, this.player.sensitivity);
         this.player.addLook(d.dyaw, d.dpitch);
+      } else if (t.clientX < window.innerWidth * STICK_ZONE) {
+        // A finger still on the glass whose slot was emptied under it — a modal
+        // opened, the rotate card came up, the room changed — is picked up again
+        // where it now is, by the same zone rule _start uses. Without this the
+        // player has to lift and re-place a thumb that never left the screen.
+        if (!this._stick) this._birthStick(t);
+      } else if (!this._look) {
+        this._birthLook(t, TAP_MAX_TRAVEL);
       }
     }
   }

@@ -126,7 +126,27 @@ function enterTouchMode() {
   updateRotateCard();
 }
 if (window.matchMedia?.('(pointer: coarse)').matches) enterTouchMode();
-window.addEventListener('touchstart', enterTouchMode, { once: true, capture: true });
+
+// Belt and braces (spec §2): a first touchstart *on the canvas* also turns
+// touch mode on, for a coarse-pointer device that called its pointer fine.
+// Two limits, because touch mode is a one-way trip for the session:
+//   · only the canvas counts — a finger on the menu, the pause card or a
+//     modal is not someone playing by touch;
+//   · a device that has moved a real mouse is a desktop machine, whatever it
+//     says about touch. A touchscreen laptop must not lose its mouse look to
+//     one stray tap. Touch-derived pointer events carry pointerType 'touch',
+//     so a touch-only device never trips this.
+let sawMouse = false;
+window.addEventListener('pointermove', (e) => {
+  if (e.pointerType === 'mouse') sawMouse = true;
+}, { capture: true, passive: true });
+// Capture on window, not on #app: the listeners TouchControls adds to #app are
+// then in place before this very touch reaches it, so the gesture that turns
+// touch mode on is also the first gesture that works.
+window.addEventListener('touchstart', (e) => {
+  if (sawMouse || !container.contains(e.target)) return;
+  enterTouchMode();
+}, { capture: true });
 document.addEventListener('touchstart', unlock);
 
 // ---------- main loop ----------
@@ -189,11 +209,11 @@ async function startLevel(id, { skipCard = false } = {}) {
 
   transitioning = false;
   paused = false;
-  // A room always begins unfrozen. Without this, pausing and then waking to the
-  // menu leaves `frozen` set and the next room cannot be walked in — on touch,
-  // *surface* → *wake to menu* is the only way out of a room, so it is the
-  // common path, not a corner.
-  player.frozen = false;
+  // A room always begins unfrozen (unless something is genuinely open over it).
+  // Without this, pausing and then waking to the menu leaves `frozen` set and
+  // the next room cannot be walked in — on touch, *surface* → *wake to menu* is
+  // the only way out of a room, so it is the common path, not a corner.
+  player.frozen = ui.modalOpen;
   levelElapsed = 0;
   playing = true;
   player.enabled = true;
