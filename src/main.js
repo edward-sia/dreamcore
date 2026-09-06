@@ -1,6 +1,7 @@
 import { Engine } from './core/Engine.js';
 import { Player } from './core/Player.js';
 import { Interaction } from './core/Interaction.js';
+import { TouchControls } from './core/TouchControls.js';
 import { UI } from './core/UI.js';
 import { AudioEngine } from './core/AudioEngine.js';
 import { SaveSystem } from './core/SaveSystem.js';
@@ -35,6 +36,8 @@ let playing = false;
 let transitioning = false;
 let paused = false;
 let levelElapsed = 0; // active seconds in the current room (pause excluded)
+let touch = null;     // TouchControls, once touch mode is on (see below)
+let orientationHeld = false; // the rotate card is holding the room (spec §5.3)
 
 // ---------- audio unlock on first gesture ----------
 const unlock = () => { audio.unlockFromGesture(); };
@@ -43,6 +46,7 @@ document.addEventListener('keydown', unlock, { once: false });
 
 // ---------- modal focus handling ----------
 ui.onModalChange = (open) => {
+  touch?.reset();
   player.frozen = open;
   if (window.__TEST_MODE__) return;
   if (open && ui.modalKind === 'keypad') {
@@ -75,9 +79,53 @@ document.getElementById('btn-quit').addEventListener('click', async () => {
   await exitToMenu();
 });
 
+// ---------- portrait hold (spec §5.3) ----------
+const rotateEl = document.getElementById('rotate');
+const portraitMq = window.matchMedia('(orientation: portrait)');
+function updateRotateCard() {
+  const hold = !!touch && portraitMq.matches && (playing || transitioning);
+  if (hold === orientationHeld) return;
+  orientationHeld = hold;
+  rotateEl.classList.toggle('hidden', !hold);
+  if (hold) {
+    touch?.reset();
+    player.frozen = true;
+  } else if (!paused && !ui.modalOpen) {
+    player.frozen = false;
+  }
+}
+portraitMq.addEventListener?.('change', updateRotateCard);
+
+// ---------- touch mode (spec §2) ----------
+function enterTouchMode() {
+  if (touch || window.__TEST_MODE__) return;
+  document.body.classList.add('touch');
+  document.getElementById('touch-hud').classList.remove('hidden');
+  player.touchMode = true;
+  ui.setTouchMode(true);
+  touch = new TouchControls({ player, interaction, ui, app: container });
+  document.getElementById('prompt').addEventListener('click', () => {
+    if (playing && !paused) interaction.trigger();
+  });
+  document.getElementById('btn-remember').addEventListener('click', () => {
+    if (playing && !paused) ui.toggleJournal();
+  });
+  document.getElementById('btn-surface').addEventListener('click', () => {
+    if (!playing || paused || ui.modalOpen) return;
+    pauseEl.classList.remove('hidden');
+    player.frozen = true;
+    paused = true;
+  });
+  updateRotateCard();
+}
+if (window.matchMedia?.('(pointer: coarse)').matches) enterTouchMode();
+window.addEventListener('touchstart', enterTouchMode, { once: true });
+document.addEventListener('touchstart', unlock);
+
 // ---------- main loop ----------
 let lastTick = performance.now();
 engine.onUpdate((dt, t) => {
+  touch?.update();          // the stick feeds the player every frame it lives
   player.update(dt);
   audio.updateListener(engine.camera);
   interaction.update();
@@ -88,7 +136,7 @@ engine.onUpdate((dt, t) => {
   const now = performance.now();
   const realDt = Math.min((now - lastTick) / 1000, 0.5);
   lastTick = now;
-  if (playing && !paused) levelElapsed += realDt;
+  if (playing && !paused && !orientationHeld) levelElapsed += realDt;
 });
 engine.start();
 
@@ -101,6 +149,7 @@ async function startLevel(id, { skipCard = false } = {}) {
   playing = false;
   player.enabled = false;
   interaction.enabled = false;
+  touch?.reset();
 
   await ui.fadeToBlack();
   disposeLevel();
@@ -139,6 +188,7 @@ async function startLevel(id, { skipCard = false } = {}) {
   interaction.enabled = true;
   if (!window.__TEST_MODE__) player.requestLock();
   if (meta.intro) ui.subtitle(meta.intro, 7);
+  updateRotateCard();
 
   window.dispatchEvent(new CustomEvent('hiraeth:levelstart', { detail: { id } }));
 }
@@ -194,10 +244,12 @@ async function exitToMenu() {
   ui.showHUD(false);
   ui.hideInterlude();
   audio.setAmbience('menu');
+  if (touch && document.fullscreenElement) document.exitFullscreen()?.catch?.(() => {});
   buildMenu();
   menuEl.classList.remove('hidden');
   await ui.fadeIn();
   transitioning = false;
+  updateRotateCard();
 }
 
 // ---------- menu ----------
@@ -242,6 +294,12 @@ function buildMenu() {
 async function beginFromMenu(id, isNew = false) {
   menuEl.classList.add('hidden');
   audio.unlockFromGesture();
+  if (touch) {
+    try {
+      const fs = document.documentElement.requestFullscreen?.({ navigationUI: 'hide' });
+      fs?.then?.(() => screen.orientation?.lock?.('landscape'))?.catch?.(() => {});
+    } catch { /* a browser that refuses either is fine — §5.3 catches it */ }
+  }
   if ((isNew || !save.data.sawPrologue) && id === 1) {
     save.data.sawPrologue = true;
     save.save();
