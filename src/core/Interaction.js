@@ -13,10 +13,10 @@ export class Interaction {
     this.current = null;
 
     document.addEventListener('keydown', (e) => {
-      if (e.code === 'KeyE' && this.enabled && this.current) this._trigger();
+      if (e.code === 'KeyE' && this.enabled && this.current) this.trigger();
     });
     document.addEventListener('mousedown', (e) => {
-      if (e.button === 0 && this.enabled && this.current && document.pointerLockElement) this._trigger();
+      if (e.button === 0 && this.enabled && this.current && document.pointerLockElement) this.trigger();
     });
   }
 
@@ -93,7 +93,20 @@ export class Interaction {
     }
   }
 
-  _trigger() {
+  /** A tap fires only when it lands on the current gaze target (touch mode). */
+  triggerFromPoint(ndcX, ndcY) {
+    if (!this.enabled || !this.current) return false;
+    const it = this._items.get(this.current);
+    if (!it || !it.enabled) return false;
+    this._ray.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
+    this._ray.far = it.distance;
+    if (!this._ray.intersectObject(this.current, true).length) return false;
+    this.trigger();
+    return true;
+  }
+
+  /** Fire the current gaze target — exactly what E does. */
+  trigger() {
     const obj = this.current;
     const it = this._items.get(obj);
     if (!it || !it.enabled) return;
