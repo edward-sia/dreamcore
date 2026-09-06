@@ -24,7 +24,7 @@ export class TouchControls {
     app.addEventListener('touchstart', (e) => this._start(e), { passive: false });
     app.addEventListener('touchmove', (e) => this._move(e), { passive: false });
     app.addEventListener('touchend', (e) => this._end(e));
-    app.addEventListener('touchcancel', (e) => this._end(e));
+    app.addEventListener('touchcancel', (e) => this._end(e, true));
     window.addEventListener('blur', () => this.reset());
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.reset();
@@ -57,7 +57,10 @@ export class TouchControls {
     if (this.ui.modalOpen || this.player.frozen) return;
     e.preventDefault();
     for (const t of e.changedTouches) {
-      if (t.clientX < window.innerWidth * STICK_ZONE && !this._stick) {
+      // Which zone the touch lands in decides what it is — a second finger in
+      // the walk zone is not a look drag, it is a finger the stick already has.
+      if (t.clientX < window.innerWidth * STICK_ZONE) {
+        if (this._stick) continue;
         this._stick = { id: t.identifier, ox: t.clientX, oy: t.clientY, dx: 0, dy: 0 };
         this._ring.style.left = `${t.clientX}px`;
         this._ring.style.top = `${t.clientY}px`;
@@ -98,7 +101,7 @@ export class TouchControls {
     }
   }
 
-  _end(e) {
+  _end(e, cancelled = false) {
     for (const t of e.changedTouches) {
       if (this._stick && t.identifier === this._stick.id) {
         this._stick = null;
@@ -109,7 +112,9 @@ export class TouchControls {
       } else if (this._look && t.identifier === this._look.id) {
         const l = this._look;
         this._look = null;
-        if (isTap(performance.now() - l.startT, l.travel)
+        // A cancelled touch is one the player did not finish — the OS took the
+        // gesture (edge swipe, notification shade, a call). It is never a tap.
+        if (!cancelled && isTap(performance.now() - l.startT, l.travel)
             && !this.ui.modalOpen && !this.player.frozen) {
           // spec §3.4: a tap fires only when it lands on the current gaze target
           const ndcX = (t.clientX / window.innerWidth) * 2 - 1;

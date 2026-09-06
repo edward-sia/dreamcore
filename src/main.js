@@ -59,7 +59,7 @@ ui.onModalChange = (open) => {
 // ---------- pause on pointer-lock loss ----------
 const pauseEl = document.getElementById('pause');
 document.addEventListener('pointerlockchange', () => {
-  if (window.__TEST_MODE__) return;
+  if (window.__TEST_MODE__ || player.touchMode) return;
   const locked = document.pointerLockElement === engine.renderer.domElement;
   if (!locked && playing && !transitioning && !ui.modalOpen) {
     pauseEl.classList.remove('hidden');
@@ -84,13 +84,15 @@ const rotateEl = document.getElementById('rotate');
 const portraitMq = window.matchMedia('(orientation: portrait)');
 function updateRotateCard() {
   const hold = !!touch && portraitMq.matches && (playing || transitioning);
-  if (hold === orientationHeld) return;
+  const changed = hold !== orientationHeld;
   orientationHeld = hold;
   rotateEl.classList.toggle('hidden', !hold);
   if (hold) {
+    // re-asserted on every call, so a room that starts while the phone is
+    // upright cannot begin unfrozen behind the card
     touch?.reset();
     player.frozen = true;
-  } else if (!paused && !ui.modalOpen) {
+  } else if (changed && !paused && !ui.modalOpen) {
     player.frozen = false;
   }
 }
@@ -102,6 +104,10 @@ function enterTouchMode() {
   document.body.classList.add('touch');
   document.getElementById('touch-hud').classList.remove('hidden');
   player.touchMode = true;
+  // The fallback path can arrive after startLevel already took a lock (spec §2:
+  // in touch mode no lock is held). touchMode is set first, so letting it go
+  // does not trip the pause-on-lock-loss handler.
+  document.exitPointerLock?.();
   ui.setTouchMode(true);
   touch = new TouchControls({ player, interaction, ui, app: container });
   document.getElementById('prompt').addEventListener('click', () => {
@@ -112,6 +118,7 @@ function enterTouchMode() {
   });
   document.getElementById('btn-surface').addEventListener('click', () => {
     if (!playing || paused || ui.modalOpen) return;
+    touch?.reset();
     pauseEl.classList.remove('hidden');
     player.frozen = true;
     paused = true;
@@ -119,7 +126,7 @@ function enterTouchMode() {
   updateRotateCard();
 }
 if (window.matchMedia?.('(pointer: coarse)').matches) enterTouchMode();
-window.addEventListener('touchstart', enterTouchMode, { once: true });
+window.addEventListener('touchstart', enterTouchMode, { once: true, capture: true });
 document.addEventListener('touchstart', unlock);
 
 // ---------- main loop ----------
@@ -182,6 +189,11 @@ async function startLevel(id, { skipCard = false } = {}) {
 
   transitioning = false;
   paused = false;
+  // A room always begins unfrozen. Without this, pausing and then waking to the
+  // menu leaves `frozen` set and the next room cannot be walked in — on touch,
+  // *surface* → *wake to menu* is the only way out of a room, so it is the
+  // common path, not a corner.
+  player.frozen = false;
   levelElapsed = 0;
   playing = true;
   player.enabled = true;
