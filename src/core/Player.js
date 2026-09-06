@@ -20,6 +20,8 @@ export class Player {
     this.enabled = false;       // input processed?
     this.frozen = false;        // overlay open — look/move suspended, physics still settles
     this.noclip = false;
+    this.touchMode = false;     // no pointer lock; TouchControls feeds inputs
+    this._touchMove = { fwd: 0, strafe: 0, hurry: false };
 
     this.solids = [];           // THREE.Box3 — walls, furniture
     this.groundMeshes = [];     // meshes raycast downward for floor height
@@ -52,15 +54,29 @@ export class Player {
     });
   }
 
+  /** Analog move from the touch stick; zeroed when the thumb lifts. */
+  setMoveInput(fwd, strafe, hurry) {
+    this._touchMove.fwd = fwd;
+    this._touchMove.strafe = strafe;
+    this._touchMove.hurry = hurry;
+  }
+
+  /** Look deltas from a touch drag — same clamps as the mouse. */
+  addLook(dyaw, dpitch) {
+    if (!this.enabled || this.frozen) return;
+    this.yaw += dyaw;
+    this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch + dpitch));
+  }
+
   requestLock() {
-    if (window.__TEST_MODE__) return;
+    if (window.__TEST_MODE__ || this.touchMode) return;
     this.dom.requestPointerLock({ unadjustedMovement: true }).catch?.(() => {
       try { this.dom.requestPointerLock()?.catch?.(() => {}); } catch { /* headless */ }
     });
   }
 
   get isLocked() {
-    return window.__TEST_MODE__ || document.pointerLockElement === this.dom;
+    return window.__TEST_MODE__ || this.touchMode || document.pointerLockElement === this.dom;
   }
 
   spawnAt(pos, yaw = 0) {
@@ -96,8 +112,10 @@ export class Player {
       if (this._keys.has('KeyS') || this._keys.has('ArrowDown')) fwd -= 1;
       if (this._keys.has('KeyA') || this._keys.has('ArrowLeft')) str -= 1;
       if (this._keys.has('KeyD') || this._keys.has('ArrowRight')) str += 1;
+      fwd += this._touchMove.fwd;
+      str += this._touchMove.strafe;
     }
-    const running = this._keys.has('ShiftLeft') || this._keys.has('ShiftRight');
+    const running = this._keys.has('ShiftLeft') || this._keys.has('ShiftRight') || this._touchMove.hurry;
     const speed = running ? RUN_SPEED : WALK_SPEED;
 
     const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
@@ -105,8 +123,11 @@ export class Player {
     const wishZ = (-cos * fwd - sin * str);
     const len = Math.hypot(wishX, wishZ) || 1;
 
-    const targetX = (wishX / len) * speed * (fwd || str ? 1 : 0);
-    const targetZ = (wishZ / len) * speed * (fwd || str ? 1 : 0);
+    // Analog magnitude: keys give hypot 0, 1 or √2, so min(1, …) reproduces
+    // the old binary behavior exactly; the stick gives the values between.
+    const mag = Math.min(1, Math.hypot(fwd, str));
+    const targetX = (wishX / len) * speed * mag;
+    const targetZ = (wishZ / len) * speed * mag;
 
     const k = 1 - Math.exp(-ACCEL * dt);
     this.velocity.x += (targetX - this.velocity.x) * k;
