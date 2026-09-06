@@ -44,7 +44,7 @@ if (!EXECUTABLE) {
   );
 }
 
-export async function launch({ port = 5199 } = {}) {
+export async function launch({ port = 5199, context = {} } = {}) {
   // No HMR and no file watcher: a run must not reload the page because
   // something edited src/ while it was in flight (that reload destroys the
   // page context mid-test and reads as a room failure).
@@ -65,7 +65,9 @@ export async function launch({ port = 5199 } = {}) {
       '--mute-audio',
     ],
   });
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  // `context` lets a caller ask for touch emulation or a phone-sized viewport
+  // (tools/touchtest.mjs); everything else gets the desktop page it always had.
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, ...context });
 
   const errors = [];
   page.on('console', (msg) => {
@@ -78,7 +80,7 @@ export async function launch({ port = 5199 } = {}) {
     await server.close().catch(() => {});
   };
 
-  return { page, errors, close, url: `http://127.0.0.1:${port}` };
+  return { page, errors, close, browser, url: `http://127.0.0.1:${port}` };
 }
 
 export async function loadLevel(page, url, level, { timeout = 30000 } = {}) {
