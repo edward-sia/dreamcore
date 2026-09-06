@@ -382,3 +382,75 @@ html, body {
 #pause { background: rgba(4, 4, 8, 0.78); z-index: 50; }
 #pause-inner { text-align: center; color: var(--ghost); display: flex; flex-direction: column; gap: 18px; align-items: center; }
 .pause-heading { font-style: italic; font-size: 22px; letter-spacing: 0.12em; opacity: 0.8; margin-bottom: 14px; }
+
+/* ---------- Touch ---------- */
+#app { touch-action: none; }
+html, body { overscroll-behavior: none; }
+
+#touch-hud { position: absolute; inset: 0; pointer-events: none; }
+#touch-corner {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top));
+  right: calc(18px + env(safe-area-inset-right));
+  display: flex; gap: 12px; pointer-events: auto;
+}
+#touch-corner button {
+  font-family: var(--serif); font-style: italic;
+  font-size: 13px; letter-spacing: 0.12em;
+  color: rgba(238, 233, 222, 0.4);
+  background: rgba(10, 10, 14, 0.4);
+  border: 1px solid rgba(238, 233, 222, 0.16);
+  border-radius: 999px;
+  padding: 10px 18px; min-height: 44px;
+  cursor: pointer;
+}
+#touch-corner button:active { color: var(--ghost); border-color: rgba(238,233,222,0.4); }
+
+#touch-stick {
+  position: absolute; width: 112px; height: 112px;
+  margin: -56px 0 0 -56px;             /* positioned by its center */
+  border-radius: 50%;
+  border: 1.5px dotted rgba(238, 233, 222, 0.3);
+  pointer-events: none;
+}
+#touch-stick-pebble {
+  position: absolute; left: 50%; top: 50%;
+  width: 40px; height: 40px; margin: -20px 0 0 -20px;
+  border-radius: 50%;
+  background: rgba(238, 233, 222, 0.22);
+  box-shadow: 0 0 14px rgba(238, 233, 222, 0.12);
+}
+
+/* the word becomes the touch button (spec §3.4) */
+body.touch #prompt {
+  left: auto; top: auto;
+  right: max(9vw, env(safe-area-inset-right));
+  bottom: 26%;
+  transform: none;
+  pointer-events: auto;
+  border: 1px solid rgba(238, 233, 222, 0.35);
+  border-radius: 999px;
+  padding: 12px 24px;
+  background: rgba(10, 10, 14, 0.45);
+}
+body.touch #items { left: 28%; bottom: 24px; }
+body.touch #subtitle { bottom: 16%; }
+body.touch #hint-keys {
+  left: 50%; right: auto; transform: translateX(-50%);
+  bottom: calc(10px + env(safe-area-inset-bottom));
+  white-space: nowrap;
+}
+body.touch #objective {
+  top: calc(18px + env(safe-area-inset-top));
+  left: calc(20px + env(safe-area-inset-left));
+}
+body.touch .keypad-btn { height: 56px; }
+body.touch #keypad-grid { grid-template-columns: repeat(3, 72px); }
+
+#rotate {
+  z-index: 55;   /* above pause (50), below the fade (60) */
+  background: radial-gradient(120% 90% at 50% 10%, #1c1a26 0%, #100f16 55%, #08080c 100%);
+}
+#rotate-inner { text-align: center; display: flex; flex-direction: column; gap: 18px; }
+#rotate .rotate-line { font-style: italic; font-size: 20px; letter-spacing: 0.1em; color: var(--ghost); }
+#rotate .rotate-small { font-size: 12px; letter-spacing: 0.22em; color: rgba(238, 233, 222, 0.35); }

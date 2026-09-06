@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
   <title>HIRAETH</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#127769;</text></svg>" />
   <link rel="stylesheet" href="/src/style.css" />
@@ -18,6 +18,13 @@
     <div id="items"></div>
     <div id="subtitle" class="hidden"></div>
     <div id="hint-keys">WASD — walk&ensp;·&ensp;E — touch&ensp;·&ensp;J — remember&ensp;·&ensp;Esc — pause</div>
+    <div id="touch-hud" class="hidden">
+      <div id="touch-corner">
+        <button id="btn-remember">remember</button>
+        <button id="btn-surface">surface</button>
+      </div>
+      <div id="touch-stick" class="hidden"><div id="touch-stick-pebble"></div></div>
+    </div>
   </div>
 
   <!-- Note / clue paper -->
@@ -25,7 +32,7 @@
     <div id="note-paper">
       <div id="note-title"></div>
       <div id="note-body"></div>
-      <div class="overlay-hint">E or click to put it down</div>
+      <div class="overlay-hint" id="note-hint">E or click to put it down</div>
     </div>
   </div>
 
@@ -34,7 +41,7 @@
     <div id="journal-inner">
       <div class="journal-heading">things you remember</div>
       <div id="journal-entries"></div>
-      <div class="overlay-hint">J to close</div>
+      <div class="overlay-hint" id="journal-hint">J to close</div>
     </div>
   </div>
 
@@ -44,7 +51,7 @@
       <div id="keypad-label"></div>
       <div id="keypad-display"></div>
       <div id="keypad-grid"></div>
-      <div class="overlay-hint">Esc to step away</div>
+      <div class="overlay-hint" id="keypad-hint">Esc to step away</div>
     </div>
   </div>
 
@@ -104,6 +111,14 @@
       <div class="pause-heading">you surface for a moment</div>
       <button id="btn-resume" class="menu-btn">sink back</button>
       <button id="btn-quit" class="menu-btn small">wake to menu</button>
+    </div>
+  </div>
+
+  <!-- Portrait hold (touch mode only) -->
+  <div id="rotate" class="overlay hidden">
+    <div id="rotate-inner">
+      <div class="rotate-line">the dream lies on its side</div>
+      <div class="rotate-small">turn your phone</div>
     </div>
   </div>
 
