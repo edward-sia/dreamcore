@@ -35,6 +35,10 @@ Headphones recommended. Progress saves automatically (localStorage).
 | J | journal — everything you've remembered so far |
 | esc | pause / put things down |
 
+On a phone (landscape): left thumb — walk (push to the rim to hurry) ·
+right thumb — drag to look · tap a thing, or the floating word, to touch
+it · **remember** and **surface** in the corner for the journal and pause.
+
 ## The rooms
 
 Each room is a puzzle that gets a little harder than the last: find the
@@ -119,11 +123,18 @@ npm run shot -- 18 --hour morning   # rooms XVI–XX also render at their other 
 npm run playtest           # prove every level is solvable end-to-end
 npm run playtest -- 7      # just level 7
 npm run test:api           # leaderboard server contract tests
+npm run test:touch         # the touch layer, on an emulated phone
+npm test                   # pure logic (node:test)
 ```
 
 Every level implements `debugSolve()`, which plays the level through its
 real interaction handlers — the playtest fails if a puzzle can't actually
 be completed.
+
+`npm run test:touch` boots a room for real (no test mode) in a Chromium
+with touch emulation and drives it with synthesized touches: the drift
+stick, holding the rim to hurry, the look drag, tapping a thing and
+tapping the word, the corner words, and turning the phone upright.
 
 The harness finds Playwright's Chromium by itself; set `CHROMIUM_PATH` to
 override. `npm test` runs the unit tests for the pure helpers; `node

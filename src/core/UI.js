@@ -6,6 +6,7 @@ export class UI {
       hud: $('hud'), crosshair: $('crosshair'), prompt: $('prompt'),
       objective: $('objective'), items: $('items'), subtitle: $('subtitle'),
       hintKeys: $('hint-keys'),
+      noteHint: $('note-hint'), journalHint: $('journal-hint'), keypadHint: $('keypad-hint'),
       noteOverlay: $('note-overlay'), noteTitle: $('note-title'), noteBody: $('note-body'),
       journal: $('journal'), journalEntries: $('journal-entries'),
       keypad: $('keypad'), keypadLabel: $('keypad-label'),
@@ -23,10 +24,18 @@ export class UI {
     this._subTimer = null;
     this._flashTimer = null;
     this._clues = [];
+    this.touchMode = false;
 
     document.addEventListener('keydown', (e) => this._onKey(e));
     this.el.noteOverlay.addEventListener('mousedown', () => {
       if (this._modal === 'note') this._closeNote();
+    });
+    // touch mode: the journal and keypad step away on a backdrop tap
+    this.el.journal.addEventListener('mousedown', (e) => {
+      if (this.touchMode && this._modal === 'journal' && e.target === this.el.journal) this._closeModal();
+    });
+    this.el.keypad.addEventListener('mousedown', (e) => {
+      if (this.touchMode && this._modal === 'keypad' && e.target === this.el.keypad) this._closeModal();
     });
 
     setTimeout(() => { this.el.hintKeys.style.opacity = '0'; }, 26000);
@@ -38,6 +47,17 @@ export class UI {
 
   /** Public close for the current overlay (also used by automated playtests). */
   closeModal() { this._closeModal(); }
+
+  /** Touch mode: gesture words instead of key words (spec §3.6). */
+  setTouchMode(on) {
+    this.touchMode = on;
+    if (!on) return;
+    this.el.hintKeys.innerHTML = 'left thumb — walk&ensp;·&ensp;right thumb — look&ensp;·&ensp;the word — touch';
+    this.el.noteHint.textContent = 'touch to put it down';
+    this.el.journalHint.textContent = 'touch outside to close';
+    this.el.keypadHint.textContent = 'touch outside to step away';
+    this.el.interludeContinue.textContent = 'touch anywhere';
+  }
 
   showHUD(on) { this.el.hud.classList.toggle('hidden', !on); }
 
@@ -228,10 +248,12 @@ export class UI {
       const done = () => {
         document.removeEventListener('keydown', done);
         document.removeEventListener('mousedown', done);
+        document.removeEventListener('touchstart', done);
         res();
       };
       document.addEventListener('keydown', done);
       document.addEventListener('mousedown', done);
+      document.addEventListener('touchstart', done);
       if (window.__TEST_MODE__) setTimeout(done, 400);
     });
     interludeText.classList.remove('show');

@@ -382,3 +382,123 @@ html, body {
 #pause { background: rgba(4, 4, 8, 0.78); z-index: 50; }
 #pause-inner { text-align: center; color: var(--ghost); display: flex; flex-direction: column; gap: 18px; align-items: center; }
 .pause-heading { font-style: italic; font-size: 22px; letter-spacing: 0.12em; opacity: 0.8; margin-bottom: 14px; }
+
+/* ---------- Touch ---------- */
+/* the canvas and the HUD never scroll, zoom or double-tap-zoom (spec §3) */
+#app, #hud { touch-action: none; }
+html, body { overscroll-behavior: none; }
+
+#touch-hud { position: absolute; inset: 0; pointer-events: none; }
+#touch-corner {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top));
+  right: calc(18px + env(safe-area-inset-right));
+  display: flex; gap: 12px; pointer-events: auto;
+}
+#touch-corner button {
+  font-family: var(--serif); font-style: italic;
+  font-size: 13px; letter-spacing: 0.12em;
+  color: rgba(238, 233, 222, 0.4);
+  background: rgba(10, 10, 14, 0.4);
+  border: 1px solid rgba(238, 233, 222, 0.16);
+  border-radius: 999px;
+  padding: 10px 18px; min-height: 44px;
+  cursor: pointer;
+}
+#touch-corner button:active { color: var(--ghost); border-color: rgba(238,233,222,0.4); }
+
+#touch-stick {
+  position: absolute; width: 112px; height: 112px;
+  margin: -56px 0 0 -56px;             /* positioned by its center */
+  border-radius: 50%;
+  border: 1.5px dotted rgba(238, 233, 222, 0.3);
+  pointer-events: none;
+}
+#touch-stick-pebble {
+  position: absolute; left: 50%; top: 50%;
+  width: 40px; height: 40px; margin: -20px 0 0 -20px;
+  border-radius: 50%;
+  background: rgba(238, 233, 222, 0.22);
+  box-shadow: 0 0 14px rgba(238, 233, 222, 0.12);
+  transition: background 0.18s ease, box-shadow 0.18s ease;
+}
+/* past the dead zone: the pebble brightens while it is actually walking */
+#touch-stick.driving #touch-stick-pebble {
+  background: rgba(238, 233, 222, 0.36);
+  box-shadow: 0 0 18px rgba(238, 233, 222, 0.22);
+}
+
+/* the word becomes the touch button (spec §3.4) */
+body.touch #prompt {
+  left: auto; top: auto;
+  right: max(9vw, env(safe-area-inset-right));
+  bottom: 26%;
+  transform: none;
+  pointer-events: auto;
+  border: 1px solid rgba(238, 233, 222, 0.35);
+  border-radius: 999px;
+  padding: 12px 24px;
+  background: rgba(10, 10, 14, 0.45);
+}
+body.touch #items { left: 28%; bottom: calc(24px + env(safe-area-inset-bottom)); }
+body.touch #subtitle { bottom: 16%; }
+body.touch #hint-keys {
+  left: 50%; right: auto; transform: translateX(-50%);
+  bottom: calc(10px + env(safe-area-inset-bottom));
+  white-space: nowrap;
+}
+body.touch #objective {
+  top: calc(18px + env(safe-area-inset-top));
+  left: calc(20px + env(safe-area-inset-left));
+}
+body.touch .keypad-btn { height: 56px; }
+body.touch #keypad-grid { grid-template-columns: repeat(3, 72px); }
+
+#rotate {
+  z-index: 55;   /* above pause (50), below the fade (60) */
+  background: radial-gradient(120% 90% at 50% 10%, #1c1a26 0%, #100f16 55%, #08080c 100%);
+}
+#rotate-inner { text-align: center; display: flex; flex-direction: column; gap: 18px; }
+#rotate .rotate-line { font-style: italic; font-size: 20px; letter-spacing: 0.1em; color: var(--ghost); }
+#rotate .rotate-small { font-size: 12px; letter-spacing: 0.22em; color: rgba(238, 233, 222, 0.35); }
+
+/* A landscape phone is short. The keypad has to fit whole — a player who
+   cannot see the digits they have entered cannot solve the room. */
+@media (max-height: 470px) {
+  body.touch #keypad-inner { padding: 14px 26px; }
+  body.touch #keypad-label { font-size: 14px; margin-bottom: 8px; }
+  body.touch #keypad-display { font-size: 22px; min-height: 30px; margin-bottom: 8px; }
+  body.touch .keypad-btn { height: 44px; font-size: 18px; }
+  body.touch #keypad-grid { grid-template-columns: repeat(3, 62px); }
+  body.touch #keypad-inner .overlay-hint { margin-top: 12px; }
+  body.touch #note-paper {
+    padding: 22px 30px 18px;
+    max-height: 92vh; overflow-y: auto;
+  }
+  body.touch #note-body { font-size: 16px; line-height: 1.6; }
+  body.touch #note-title { margin-bottom: 10px; }
+  body.touch #note-paper .overlay-hint { margin-top: 14px; }
+}
+
+/* A narrow screen (a phone held upright at the menu, spec §5.2) cannot fit
+   five room cells across; four fit, and nothing runs off the edges. */
+/* The menu is taller than a phone in either orientation once the rooms or the
+   leaderboard are open — landscape especially, where there are only ~390px of
+   height. Scroll it rather than clipping the rows off both ends (spec §5.2). */
+@media (max-width: 560px), (max-height: 620px) {
+  #menu { align-items: safe center; overflow-y: auto; padding: 20px 0; }
+}
+
+@media (max-width: 560px) {
+  #menu-levels {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: min(92vw, 420px);
+    margin-left: auto; margin-right: auto;
+  }
+  #menu-footer { padding: 0 6vw; font-size: 11px; }
+  #menu-sub { margin-bottom: 38px; }
+}
+
+/* The subtitle is centred and the word-pill sits at the right edge; on a phone
+   they must not share a line (spec §3.7). */
+body.touch #subtitle { max-width: 34ch; font-size: 16px; }

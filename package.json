@@ -17,6 +17,7 @@
     "shot": "node tools/screenshot.mjs",
     "playtest": "node tools/playtest.mjs",
     "test:api": "node tools/leaderboard-test.mjs",
+    "test:touch": "node tools/touchtest.mjs",
     "test": "node --test tests/*.test.mjs"
   },
   "engines": {
