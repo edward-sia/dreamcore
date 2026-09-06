@@ -419,6 +419,12 @@ html, body { overscroll-behavior: none; }
   border-radius: 50%;
   background: rgba(238, 233, 222, 0.22);
   box-shadow: 0 0 14px rgba(238, 233, 222, 0.12);
+  transition: background 0.18s ease, box-shadow 0.18s ease;
+}
+/* past the dead zone: the pebble brightens while it is actually walking */
+#touch-stick.driving #touch-stick-pebble {
+  background: rgba(238, 233, 222, 0.36);
+  box-shadow: 0 0 18px rgba(238, 233, 222, 0.22);
 }
 
 /* the word becomes the touch button (spec §3.4) */
