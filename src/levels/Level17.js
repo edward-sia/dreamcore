@@ -678,7 +678,7 @@ export default class Level17 extends LevelBase {
     this._clockFace.setTime(3, 7, 0);
     this.add(this._clockFace);
     this.track(this._clockFace);
-    this.interact(drum, { prompt: 'the clock', distance: 3.0, onInteract: () => this._wind() });
+    this.interact(drum, { prompt: 'turn the clock', distance: 3.0, onInteract: () => this._wind() });
     this._clockDrum = drum;
   }
 
@@ -699,6 +699,7 @@ export default class Level17 extends LevelBase {
     this.hours.next();
     if (!this._wound) {
       this._wound = true;
+      this.rememberHours();
       this.subtitle('The hands move. They never did, before.', 5);
       this.setObjective('the hall, at another hour');
     }

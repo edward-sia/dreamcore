@@ -172,7 +172,7 @@ export default class Level06 extends LevelBase {
             '— M.',
         });
         this._readRhyme = true;
-        this.setObjective('the rhyme, walked');
+        if (!this.hasItem('small-key') && !this._gateOpen) this.setObjective('the rhyme, walked');
       },
     });
 
@@ -236,7 +236,8 @@ export default class Level06 extends LevelBase {
           title: 'where the line meets the wire',
           body:
             'The line from the dead tree meets the fence at the rotten stile.\n' +
-            'Thirteen posts on from here, toward the star. Then look down.',
+            'Thirteen posts on from here, toward the star.\n' +
+            'The first post beyond the stile counts as one. Then look down.',
         });
         this.subtitle('The walked line meets the wire at the broken stile. The counting starts here.', 6);
       }

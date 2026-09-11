@@ -253,6 +253,7 @@ export default class Level09 extends LevelBase {
     ladder.position.set(-5.6, 0, runs[0].z - 0.62);
     this.add(ladder);
     this.addCollider(ladder);
+    const ladderCollider = this.solids[this.solids.length - 1];
     this._ladderTarget = null;
     this.interact(ladder, {
       prompt: 'roll the ladder',
@@ -285,6 +286,8 @@ export default class Level09 extends LevelBase {
         ladder.position.x += Math.sign(dx) * Math.min(Math.abs(dx), step);
         ladder.position.z += Math.sign(dz) * Math.min(Math.abs(dz), step * 0.6);
       }
+      ladder.updateWorldMatrix(true, true);
+      ladderCollider.setFromObject(ladder);
     });
 
     // ---------- the reading table, the green lamp, the master card ----------

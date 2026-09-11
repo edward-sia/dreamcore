@@ -191,7 +191,7 @@ export default class Level01 extends LevelBase {
     this.addCollider(table);
 
     const note = makeNoteProp();
-    note.position.set(-WIDTH / 2 + 0.35, 0.795, -4);
+    note.position.set(-WIDTH / 2 + 0.35, 0.806, -4);
     this.add(note);
     this.interact(note, {
       prompt: 'read the note',
@@ -205,7 +205,7 @@ export default class Level01 extends LevelBase {
             'You watered them every Sunday. Remember?\n\n' +
             '— M.',
         });
-        this.setObjective('find the key, where the flowers used to be');
+        if (!this.hasItem('brass-key') && !this._exitOpen) this.setObjective('find the key, where the flowers used to be');
         this._readNote = true;
       },
     });

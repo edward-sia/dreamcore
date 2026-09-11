@@ -580,7 +580,7 @@ export default class Level18 extends LevelBase {
     this._clockFace.rotation.y = Math.PI / 2;
     this._clockFace.setTime(3, 7, 0);
     this.add(this._clockFace); this.track(this._clockFace);
-    this.interact(body, { prompt: 'the clock', distance: 3, onInteract: () => this._wind() });
+    this.interact(body, { prompt: 'turn the clock', distance: 3, onInteract: () => this._wind() });
     this._clockBody = body;
   }
 
@@ -666,6 +666,7 @@ export default class Level18 extends LevelBase {
     this.hours.next();
     if (!this._wound) {
       this._wound = true;
+      this.rememberHours();
       this.subtitle('The hands move. They never did, before.', 5);
       this.setObjective('the wireless, at another hour');
     }
@@ -701,7 +702,7 @@ export default class Level18 extends LevelBase {
         });
       }
     } });
-    this.hours.bind('evening', { onLeave: () => { clearTimeout(this._timers?.tune); this._radio?.stop(0.5); this._radio = null; } });
+    this.hours.bind('evening', { onLeave: () => { this.cancelAfter(this._timers?.tune); this._radio?.stop(0.5); this._radio = null; } });
     this.hours.bind('night', { onEnter: () => {
       if (!this._tuned) this._setNeedle(this._digits ? parseInt(this._digits.padEnd(3, '0'), 10) : 540);
       this._radio = this.loopAt('radio', WIRELESS); this._radio.setGain(this._tuned ? 0.2 : 0.25);
@@ -712,7 +713,7 @@ export default class Level18 extends LevelBase {
       };
       this._timers.static = this.after(4, st);
     } });
-    this.hours.bind('night', { onLeave: () => { clearTimeout(this._timers?.static); this._radio?.stop(0.5); this._radio = null; } });
+    this.hours.bind('night', { onLeave: () => { this.cancelAfter(this._timers?.static); this._radio?.stop(0.5); this._radio = null; } });
     this.hours.bind('morning', { onEnter: () => { if (!this._exitOpen) { this._hallDoor.setAngle(Math.PI / 2); this._blockDoor(false); } } });
     this.hours.bind('morning', { onLeave: () => { if (!this._exitOpen) { this._hallDoor.setAngle(0); this._blockDoor(true); } } });
 
@@ -769,7 +770,7 @@ export default class Level18 extends LevelBase {
     if (this._digits.length < 3) { this.setObjective('keep out of its light'); return; }
     if (this._digits === STATION) { this._tunedNow(); return; }
     this.playSoundAt('static', WIRELESS, { dur: 0.8 });
-    this.subtitle('Between stations. The needle always rested a little past the middle.', 5);
+    this.subtitle('Between stations. In her evening, a label on the glass marks the station.', 5);
     this._digits = ''; this._setNeedle(540);
     this._wrongCount++;
     if (this._wrongCount >= 2) this.after(4, () => this.subtitle('There is a label on the glass, at half past eight.', 5));

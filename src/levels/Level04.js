@@ -451,6 +451,7 @@ export default class Level04 extends LevelBase {
       this.subtitle(line, 4.5);
       if (logged.size === 4) {
         this.after(4.8, () => {
+          if (this._officeOpen) return;
           this.subtitle('The office will want the list in order.', 5);
           this.setObjective('the staff door, in the order she wrote them');
         });
@@ -748,7 +749,7 @@ export default class Level04 extends LevelBase {
               this.removeColliderOf(officeDoor.panel);
               this.game.interaction.remove(officeDoor);
               this.playSound('door');
-              this.subtitle('It opens on the first try, as if it had been waiting to.', 4.5);
+              this.subtitle('The lock gives, as if it had been waiting for her list.', 4.5);
               this.setObjective('through the office, out the back');
             } else {
               this.playSound('wrong');

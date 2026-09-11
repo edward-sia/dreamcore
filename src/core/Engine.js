@@ -52,7 +52,7 @@ const DreamGradeShader = {
       col += (0.5 - luma) * vec3(-0.012, -0.004, 0.02);
 
       // vignette
-      float vig = smoothstep(0.95, 0.28, r2 * uVignette);
+      float vig = 1.0 - smoothstep(0.28, 0.95, r2 * uVignette);
       col *= mix(0.62, 1.0, vig);
 
       // animated grain

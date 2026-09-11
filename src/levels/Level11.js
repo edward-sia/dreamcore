@@ -627,7 +627,7 @@ export default class Level11 extends LevelBase {
       return;
     }
     this._answered = true;
-    clearTimeout(this._burstTimer);
+    this.cancelAfter(this._burstTimer);
     if (this._round === 3) {
       this.hush(1.4, 0.9);                                      // silence, and then the back of the wardrobe
       this.after(1.5, () => this._openPanel());

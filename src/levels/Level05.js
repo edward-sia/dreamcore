@@ -823,7 +823,7 @@ export default class Level05 extends LevelBase {
         this._keyTaken = true;
         this.giveItem({ id: 'room-key', name: 'a small key, warm from the kitchen light' });
         this.subtitle('Small, and warm from the bulb — as if she had only just set it down.', 5);
-        this.setObjective('the door at the top of the stairs');
+        this.setObjective(this._allOn ? 'the door at the top of the stairs' : 'finish the evening at the fuse box');
       },
     });
     this.game.interaction.setEnabled(key, false);
@@ -885,7 +885,7 @@ export default class Level05 extends LevelBase {
       prompt: 'the door to your room',
       onInteract: () => {
         if (this._doorOpen) return;
-        if (this.hasItem('room-key')) {
+        if (this.hasItem('room-key') && this._allOn) {
           this.playSound('unlock');
           this.removeItem('room-key');
           upDoor.setOpen(true, 1);
@@ -898,7 +898,9 @@ export default class Level05 extends LevelBase {
         } else {
           this.playSound('locked');
           this.subtitle(
-            this._allOn
+            this.hasItem('room-key') && !this._allOn
+              ? 'The key fits, but the house is still dark. Finish the evening at the fuse box.'
+              : this._allOn
               ? 'Locked. The key will be where small things were always left — in the kitchen.'
               : 'Locked. Under the door, the light keeps its patience.',
             5

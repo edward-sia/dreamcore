@@ -1061,7 +1061,7 @@ export default class Level19 extends LevelBase {
     this._clockFace.rotation.y = -Math.PI / 2;                 // faces −X, into the landing
     this._clockFace.setTime(3, 7, 0);
     this.add(this._clockFace); this.track(this._clockFace);
-    this.interact(body, { prompt: 'the clock', distance: 3, onInteract: () => this._wind() });
+    this.interact(body, { prompt: 'turn the clock', distance: 3, onInteract: () => this._wind() });
     this._clockBody = body;
     this.tick((dt) => {                                         // it ticks at the evening and the morning
       if (this.hours.is('night')) return;
@@ -1079,6 +1079,7 @@ export default class Level19 extends LevelBase {
     this.hours.next();
     if (!this._wound) {
       this._wound = true;
+      this.rememberHours();
       this.subtitle('The hands move. They never did, before.', 5);
     }
   }

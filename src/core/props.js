@@ -458,8 +458,19 @@ export function makeDust({ count = 220, box = [12, 4, 12], center = [0, 2, 0], s
     pos[i * 3 + 2] = center[2] + (Math.random() - 0.5) * box[2];
   }
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  // A soft round mote instead of the default square point sprite.
+  const pixels = new Uint8Array(32 * 32 * 4);
+  for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+    const i = (y * 32 + x) * 4;
+    const radius = Math.hypot((x + 0.5 - 16) / 16, (y + 0.5 - 16) / 16);
+    pixels[i] = pixels[i + 1] = pixels[i + 2] = 255;
+    pixels[i + 3] = Math.round(255 * Math.pow(Math.max(0, 1 - radius), 1.5));
+  }
+  const sprite = new THREE.DataTexture(pixels, 32, 32);
+  sprite.needsUpdate = true;
+  sprite.magFilter = THREE.LinearFilter;
   const mat = new THREE.PointsMaterial({
-    color, size, transparent: true, opacity: 0.22, depthWrite: false,
+    color, size, map: sprite, transparent: true, opacity: 0.22, depthWrite: false,
   });
   const pts = new THREE.Points(geo, mat);
   const speeds = Array.from({ length: count }, () => 0.05 + Math.random() * 0.12);
@@ -470,7 +481,7 @@ export function makeDust({ count = 220, box = [12, 4, 12], center = [0, 2, 0], s
       const minY = center[1] - box[1] / 2;
       if (y < minY) y = center[1] + box[1] / 2;
       p.setY(i, y);
-      p.setX(i, p.getX(i) + Math.sin(t * 0.3 + i) * 0.0008);
+      p.setX(i, p.getX(i) + Math.sin(t * 0.3 + i) * 0.048 * dt);
     }
     p.needsUpdate = true;
   };

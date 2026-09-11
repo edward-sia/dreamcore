@@ -197,7 +197,9 @@ clues are indirect, and mapping them onto the world is the work.**
   went." The porch switch never counts as wrong — it is simply dead.
 - Only in the LIT kitchen does the small key on the table become
   findable (visible + interactable once powered); it opens the door at
-  the top of the stairs. Light spills under it. Threshold completes.
+  the top of the stairs once the full evening sequence is lit. Taking the
+  key early is allowed; the door reminds you to finish the evening. Light
+  spills under it. Threshold completes.
 
 ### VI — The Field (`field`)
 
@@ -338,8 +340,9 @@ production notes apply (one file per room, ports 51NN/52NN, full-suite gate
 
 ## Production notes
 
-- One file per room: `src/levels/LevelNN.js`, auto-discovered. Never
-  touch shared files.
+- One file per room: `src/levels/LevelNN.js`, auto-discovered. Keep room-only
+  changes in their level file. Shared engine/UI fixes require the full
+  20-room playtest plus input and touch regressions.
 - Verify loop per room, per `LEVEL_API.md`: `npx vite build` →
   `node tools/screenshot.mjs N --port 51NN` (look at the four shots,
   iterate until composed and atmospheric) →

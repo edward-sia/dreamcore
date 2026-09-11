@@ -699,10 +699,12 @@ export default class Level07 extends LevelBase {
     });
     this._boardMat = boardMat;
     const boardBack = new THREE.Mesh(new THREE.BoxGeometry(2.9, 1.55, 0.1), metalMat);
-    boardBack.position.set(-3.4, 1.95, 4.75);
+    // The station wall's front is z=4.7. Mount the whole casing ahead of it;
+    // a coplanar front face breaks into flickering blocks during mouse-look.
+    boardBack.position.set(-3.4, 1.95, 4.64);
     this.add(boardBack);
     const board = new THREE.Mesh(new THREE.PlaneGeometry(2.7, 1.35), boardMat);
-    board.position.set(-3.4, 1.95, 4.68);
+    board.position.set(-3.4, 1.95, boardBack.position.z - 0.07);
     board.rotation.y = Math.PI;
     this.add(board);
     this._board = board;

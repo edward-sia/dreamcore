@@ -41,8 +41,8 @@ const gazeIs = (word) => until((w) => {
 }, word);
 
 // One synthetic touch on #app: start, optional drag in steps, optional hold, end.
-async function gesture(target, from, to = from, { steps = 6, dragMs = 90, holdMs = 0, end = 'touchend', id = 7 } = {}) {
-  await target.evaluate(async ({ from, to, steps, dragMs, holdMs, end, id }) => {
+async function gesture(target, from, to = from, { steps = 6, dragMs = 90, holdMs = 0, holdFrames = 0, end = 'touchend', id = 7 } = {}) {
+  await target.evaluate(async ({ from, to, steps, dragMs, holdMs, holdFrames, end, id }) => {
     const app = document.getElementById('app');
     const fire = (type, x, y) => {
       const t = new Touch({ identifier: id, target: app, clientX: x, clientY: y });
@@ -57,9 +57,10 @@ async function gesture(target, from, to = from, { steps = 6, dragMs = 90, holdMs
       await new Promise((r) => setTimeout(r, dragMs / steps));
       fire('touchmove', from.x + ((to.x - from.x) * i) / steps, from.y + ((to.y - from.y) * i) / steps);
     }
+    for (let i = 0; i < holdFrames; i++) await new Promise(requestAnimationFrame);
     if (holdMs) await new Promise((r) => setTimeout(r, holdMs));
     fire(end, to.x, to.y);
-  }, { from, to, steps, dragMs, holdMs, end, id });
+  }, { from, to, steps, dragMs, holdMs, holdFrames, end, id });
 }
 
 // Put the player somewhere and wait until the room has actually been redrawn
@@ -134,7 +135,9 @@ try {
   // 3. The stick walks the player down the hall (forward = -z).
   await at(0, -1, 0);
   const z0 = await page.evaluate(() => window.__game.player.position.z);
-  await gesture(page, { x: 170, y: 300 }, { x: 170, y: 244 }, { holdMs: 900 });
+  // Movement uses clamped simulation time: a fixed wall-clock hold can render
+  // too few updates on a busy software GPU even while the stick works.
+  await gesture(page, { x: 170, y: 300 }, { x: 170, y: 244 }, { holdFrames: 24 });
   const z1 = await page.evaluate(() => window.__game.player.position.z);
   check('stick moves the player forward', z1 < z0 - 0.5, `z ${z0.toFixed(2)} -> ${z1.toFixed(2)}`);
 
@@ -161,7 +164,7 @@ try {
   const yaw1 = await page.evaluate(() => window.__game.player.yaw);
   check('look drag turns the head', yaw1 - yaw0 > 0.2, `yaw ${yaw0.toFixed(2)} -> ${yaw1.toFixed(2)}`);
 
-  // 6. Tap-the-thing: face the note on the table at (-1.0, 0.795, -4) and tap
+  // 6. Tap-the-thing: face the note on the table at (-1.0, 0.806, -4) and tap
   //    the screen centre — the ray from the tap lands on the current target.
   await at(-0.3, -3.2, 0.72, -0.66);
   await gazeIs('read the note');

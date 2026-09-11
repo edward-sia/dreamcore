@@ -38,6 +38,8 @@ let paused = false;
 let levelElapsed = 0; // active seconds in the current room (pause excluded)
 let touch = null;     // TouchControls, once touch mode is on (see below)
 let orientationHeld = false; // the rotate card is holding the room (spec §5.3)
+let roomTime = 0;
+ui.canOpenJournal = () => playing && !paused && !transitioning && !orientationHeld;
 
 // ---------- audio unlock on first gesture ----------
 const unlock = () => { audio.unlockFromGesture(); };
@@ -47,11 +49,13 @@ document.addEventListener('keydown', unlock, { once: false });
 // ---------- modal focus handling ----------
 ui.onModalChange = (open) => {
   touch?.reset();
-  player.frozen = open;
+  player.frozen = open || paused || orientationHeld || !playing;
+  interaction.enabled = playing && !paused && !orientationHeld && !open;
+  interaction.current = null;
   if (window.__TEST_MODE__) return;
   if (open && ui.modalKind === 'keypad') {
     document.exitPointerLock?.();
-  } else if (!open && playing) {
+  } else if (!open && playing && !paused && !orientationHeld) {
     player.requestLock();
   }
 };
@@ -152,18 +156,25 @@ document.addEventListener('touchstart', unlock);
 // ---------- main loop ----------
 let lastTick = performance.now();
 engine.onUpdate((dt, t) => {
-  touch?.update();          // the stick feeds the player every frame it lives
-  player.update(dt);
-  audio.updateListener(engine.camera);
-  interaction.update();
-  currentLevel?.update(dt, t);
-  // Room timer: wall-clock seconds, so slow machines aren't under-billed by
-  // the engine's dt clamp. Capped per frame so a suspended tab isn't billed,
-  // frozen while paused, immune to debug timeScale.
   const now = performance.now();
   const realDt = Math.min((now - lastTick) / 1000, 0.5);
   lastTick = now;
-  if (playing && !paused && !orientationHeld) levelElapsed += realDt;
+  const active = playing && !paused && !orientationHeld && !document.hidden;
+  const simulating = active && !ui.modalOpen;
+  player.frozen = !simulating;
+  interaction.enabled = simulating;
+  touch?.update();          // the stick feeds the player every frame it lives
+  if (simulating) player.update(dt);
+  audio.updateListener(engine.camera);
+  interaction.update();
+  if (simulating) {
+    roomTime += realDt;
+    currentLevel?.update(dt, roomTime, realDt);
+  }
+  // Room timer: wall-clock seconds, so slow machines aren't under-billed by
+  // the engine's dt clamp. Capped per frame so a suspended tab isn't billed,
+  // frozen while paused, immune to debug timeScale.
+  if (active) levelElapsed += realDt;
 });
 engine.start();
 
@@ -215,6 +226,7 @@ async function startLevel(id, { skipCard = false } = {}) {
   // the only way out of a room, so it is the common path, not a corner.
   player.frozen = ui.modalOpen;
   levelElapsed = 0;
+  roomTime = 0;
   playing = true;
   player.enabled = true;
   interaction.enabled = true;
@@ -408,8 +420,21 @@ window.__game = {
   get level() { return currentLevel; },
   get playing() { return playing; },
   get levelElapsed() { return levelElapsed; },
+  get paused() { return paused; },
   player, ui, audio, interaction, engine, save, leaderboard,
   loadLevel: (id) => startLevel(id, { skipCard: true }),
   solve: () => currentLevel?.debugSolve(),
   levels: LEVELS.map((L) => L.meta),
 };
+
+window.render_game_to_text = () => JSON.stringify({
+  coordinates: 'metres; +x right, +y up, forward at yaw 0 is -z; position is eye height',
+  room: currentLevel?.constructor.meta.id ?? null,
+  mode: transitioning ? 'transition' : !playing ? 'menu' : paused ? 'paused' : orientationHeld ? 'rotate' : ui.modalKind ?? 'playing',
+  hour: currentLevel?.hours?.current ?? null,
+  position: player.position.toArray(), yaw: player.yaw, pitch: player.pitch,
+  objective: ui.el.objective.textContent,
+  target: interaction.current ? interaction._items.get(interaction.current)?.prompt : null,
+  items: currentLevel?._items ?? [],
+  completed: currentLevel?.isCompleted ?? false,
+});
