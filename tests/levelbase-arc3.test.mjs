@@ -66,12 +66,12 @@ test('isSeenBy: an occluder between the object and the camera hides the camera',
   assert.equal(lvl.isSeenBy(child, { occluders: [wall] }), true);
 });
 
-test('footsteps walks a polyline at a stride, one positional sound per step, then onDone', async () => {
+test('footsteps walks a polyline at a stride, one positional sound per step, then onDone', () => {
   const g = fakeGame(); const lvl = new L(g); lvl.init();
   let done = false; const steps = [];
   lvl.footsteps([{ x: 0, y: 0, z: 0 }, { x: 2, y: 0, z: 0 }, { x: 2, y: 0, z: 1 }],
     { stride: 1, every: 0.01, sound: 'smallStep', opts: { soft: true }, onStep: (i, p) => steps.push([i, p.x, p.z]), onDone: () => { done = true; } });
-  await new Promise((r) => setTimeout(r, 120));
+  for (let i = 0; i < 12; i++) lvl.update(0.01, i * 0.01);
   assert.equal(done, true);
   assert.equal(g.calls.sfxAt.length, 4);                       // length 3 → floor(3/1)+1 = 4 steps
   assert.equal(g.calls.sfxAt[0].name, 'smallStep');
@@ -79,13 +79,13 @@ test('footsteps walks a polyline at a stride, one positional sound per step, the
   assert.deepEqual(steps.map((s) => s.slice(1)), [[0, 0], [1, 0], [2, 0], [2, 1]]);
 });
 
-test('footsteps: cancel() stops the remaining steps', async () => {
+test('footsteps: cancel() stops the remaining steps', () => {
   const g = fakeGame(); const lvl = new L(g); lvl.init();
   const cancel = lvl.footsteps([{ x: 0, y: 0, z: 0 }, { x: 5, y: 0, z: 0 }], { stride: 1, every: 0.02 });
-  await new Promise((r) => setTimeout(r, 30));
+  lvl.update(0.03, 0.03);
   cancel();
   const n = g.calls.sfxAt.length;
-  await new Promise((r) => setTimeout(r, 80));
+  lvl.update(0.08, 0.11);
   assert.equal(g.calls.sfxAt.length, n);
   assert.ok(n >= 1 && n < 6);
 });

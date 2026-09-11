@@ -25,6 +25,9 @@ npm run dev        # then open the printed URL
 ```
 
 Headphones recommended. Progress saves automatically (localStorage).
+Room events stop while paused, while reading a note or journal, and while
+a phone is held upright. Sound descriptions appear separately from narrative
+subtitles, so a knock cannot erase a clue mid-sentence.
 
 | key | |
 |---|---|
@@ -54,6 +57,7 @@ Rooms XVI–XX exist at three hours — her evening, 3:07, and the morning the
 house is emptied — and this time you leave the clues instead of finding
 them. The clock in each room moves you between hours; only the night
 counts.
+The first turn of each clock records the rules in your journal.
 
 ## The dreamers — leaderboard
 
@@ -125,11 +129,20 @@ npm run playtest -- 7      # just level 7
 npm run test:api           # leaderboard server contract tests
 npm run test:touch         # the touch layer, on an emulated phone
 npm test                   # pure logic (node:test)
+npm run test:review         # overlay races, room regressions, pause/portrait/menu flow
+npm run test:platform       # departures-frame depth, mouse-look captures, and E interaction
+npm run review:shots        # 20 rooms + alternate hours → shots/review/
+npm run review:shots -- 20  # one room; XIX and XX include interior viewpoints
+npm run review:sheets       # contact sheets from the captured views
 ```
 
 Every level implements `debugSolve()`, which plays the level through its
 real interaction handlers — the playtest fails if a puzzle can't actually
 be completed.
+The solver uses direct interaction calls and teleports, so it is a puzzle
+state check rather than a complete human walkthrough. The review tests add
+real keyboard/touch input, aiming checks, layout checks, and regression cases.
+See [the room-by-room review](docs/LEVEL_REVIEW.md) for findings and coverage.
 
 `npm run test:touch` boots a room for real (no test mode) in a Chromium
 with touch emulation and drives it with synthesized touches: the drift

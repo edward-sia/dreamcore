@@ -167,6 +167,7 @@ export default class Level16 extends LevelBase {
     this.hours.next();
     if (!this._wound) {
       this._wound = true;
+      this.rememberHours();
       this.subtitle('The hands move. They never did, before.', 5);
     }
   }
@@ -755,9 +756,9 @@ export default class Level16 extends LevelBase {
     this._clockFace.setTime(3, 7, 0);
     this.add(this._clockFace);
     this.track(this._clockFace);
-    this.interact(ring, { prompt: 'the clock', distance: 3.4, onInteract: () => this._wind() });
+    this.interact(ring, { prompt: 'turn the clock', distance: 3.4, onInteract: () => this._wind() });
     // the rim is a thin torus; aiming at the middle of the clock must work too
-    this.interact(this._clockFace, { prompt: 'the clock', distance: 3.4, onInteract: () => this._wind() });
+    this.interact(this._clockFace, { prompt: 'turn the clock', distance: 3.4, onInteract: () => this._wind() });
     this._clockRing = ring;
   }
 
@@ -1006,7 +1007,7 @@ export default class Level16 extends LevelBase {
     this._stopTap();
     this._hatchRadio?.stop(0.5);
     this._hatchRadio = null;
-    clearTimeout(this._timers.yours);
+    this.cancelAfter(this._timers.yours);
     this._timers.yours = null;
     this._crackGlow.visible = false;
     this._strip.material.emissiveIntensity = 0;
@@ -1056,7 +1057,7 @@ export default class Level16 extends LevelBase {
         this.subtitle('A music box, upstairs. Winding down.', 4);
         this.cue('a music box, upstairs', new THREE.Vector3(OVERHEAD_MUSIC.x, OVERHEAD_MUSIC.y, OVERHEAD_MUSIC.z));
         note('a music box, upstairs. your room.');
-      } else { clearTimeout(this._timers.yours); this._timers.yours = null; this._crackGlow.visible = false; }
+      } else { this.cancelAfter(this._timers.yours); this._timers.yours = null; this._crackGlow.visible = false; }
     }
   }
 

@@ -47,10 +47,10 @@ export default class Level10 extends LevelBase {
     this.add(counter);
 
     // ---------- the beach ----------
-    const sandMat = makeMat('carpet', { base: '#968972', repeat: [40, 34] });
-    const sand = new THREE.Mesh(new THREE.PlaneGeometry(170, 52), sandMat);
+    const sandMat = makeMat('carpet', { base: '#968972', repeat: [122.35, 196.15] });
+    const sand = new THREE.Mesh(new THREE.PlaneGeometry(520, 300), sandMat);
     sand.rotation.x = -Math.PI / 2;
-    sand.position.set(0, 0, -15);
+    sand.position.set(0, 0, 109); // keep the shoreline at -41; extend behind and beyond the fog
     sand.receiveShadow = true;
     this.add(sand);
     this.addGround(sand);
@@ -69,14 +69,14 @@ export default class Level10 extends LevelBase {
     }
 
     // the sea — still, patient, faintly moving
-    const water = makeWater({ width: 260, depth: 90, color: 0x39474a, opacity: 0.96 });
-    water.position.set(0, -0.1, WATERLINE - 45.2);
+    const water = makeWater({ width: 520, depth: 300, color: 0x39474a, opacity: 0.96 });
+    water.position.set(0, -0.1, WATERLINE - 150.2);
     this.add(water);
     this.track(water);
 
     // a thin brighter line where the water meets the sand
     const foam = new THREE.Mesh(
-      new THREE.PlaneGeometry(240, 2.4),
+      new THREE.PlaneGeometry(520, 2.4),
       new THREE.MeshStandardMaterial({
         color: 0xd8cfc0, roughness: 1, transparent: true, opacity: 0.65,
       })
@@ -401,10 +401,10 @@ export default class Level10 extends LevelBase {
     // ---------- act 3: the walk to the water ----------
     this._act3 = false;
     this._saidLines = 0;
-    this.tick(() => {
+    this.tick((dt) => {
       if (this._sinkMound && mound.scale.y > 0.02) {
-        mound.scale.y = Math.max(0.02, mound.scale.y - 0.006);
-        mound.position.y -= 0.002;
+        mound.scale.y = Math.max(0.02, mound.scale.y - 0.36 * dt);
+        mound.position.y -= 0.12 * dt;
       }
       const p = s.game.player.position;
       if (this._doorOpen && !this._act3 && p.z < DOOR_Z - 0.6) {
@@ -415,8 +415,8 @@ export default class Level10 extends LevelBase {
       if (this._act3) {
         // the fog lifts as you walk the last stretch
         const f = this.scene.fog;
-        f.far += (170 - f.far) * 0.008;
-        f.color.lerp(new THREE.Color('#c9bcab'), 0.006);
+        f.far += (170 - f.far) * (1 - Math.exp(-0.482 * dt));
+        f.color.lerp(new THREE.Color('#c9bcab'), 1 - Math.exp(-0.361 * dt));
         this.scene.background.copy(f.color);
         const span = Math.abs(WATERLINE - (DOOR_Z - 0.6));
         const gone = Math.min(1, Math.abs(p.z - (DOOR_Z - 0.6)) / span);

@@ -853,7 +853,7 @@ export default class Level15 extends LevelBase {
   _stopOverhead(fade = 0.4) {
     for (const h of this._overhead) h.stop(fade);
     this._overhead = [];
-    for (const id of Object.values(this._timers)) clearTimeout(id);
+    for (const id of Object.values(this._timers)) this.cancelAfter(id);
     this._timers = {};
     for (const g of Object.values(this._glows)) g.visible = false;
   }

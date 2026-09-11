@@ -59,14 +59,22 @@ export class LevelBase {
 
   build() { throw new Error('level must implement build()'); }
 
-  update(dt, t) {
+  update(dt, t, timerDt = dt) {
+    // Snapshot: callbacks created by a callback start counting next frame.
+    for (const timer of [...this._timeouts]) {
+      if (!this._timeouts.has(timer)) continue;
+      timer.remaining -= timerDt;
+      if (timer.remaining <= 0) {
+        this._timeouts.delete(timer);
+        timer.fn();
+      }
+    }
     for (const fn of this._tickers) fn(dt, t);
     for (const obj of this._tracked) obj.update?.(dt, t);
     this.onUpdate?.(dt, t);
   }
 
   dispose() {
-    for (const id of this._timeouts) clearTimeout(id);
     this._timeouts.clear();
     for (const h of this._loops) { try { h.stop?.(0.3); } catch {} }
     this._loops.clear();
@@ -146,10 +154,13 @@ export class LevelBase {
   }
 
   after(seconds, fn) {
-    const id = setTimeout(() => { this._timeouts.delete(id); fn(); }, seconds * 1000);
-    this._timeouts.add(id);
-    return id;
+    const timer = { remaining: seconds, fn };
+    this._timeouts.add(timer);
+    return timer;
   }
+
+  /** Cancel a room-time callback returned by after(). */
+  cancelAfter(timer) { this._timeouts.delete(timer); }
 
   // ---------- interaction / narrative ----------
 
@@ -159,6 +170,16 @@ export class LevelBase {
   }
 
   setObjective(text) { this.game.ui.setObjective(text); }
+
+  rememberHours() {
+    this.learnClue({
+      id: `l${this.constructor.meta.id}-hours`,
+      title: 'the three hours',
+      body: 'Turn the clock to move between 3:07, the morning, and her evening.\n' +
+        'Look in every hour. Things you carry travel with you.\n' +
+        'Leave things for the child at 3:07; the other hours show you what belongs where.',
+    });
+  }
 
   subtitle(text, duration) { this.game.ui.subtitle(text, duration); }
 
@@ -229,7 +250,7 @@ export class LevelBase {
     }
     return () => {
       cancelled = true;
-      for (const id of ids) { clearTimeout(id); this._timeouts.delete(id); }
+      for (const id of ids) this.cancelAfter(id);
     };
   }
 

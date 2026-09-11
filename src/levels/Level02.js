@@ -127,6 +127,7 @@ export default class Level02 extends LevelBase {
     const mk1 = markerMat('1', 128);
     const mk2 = markerMat('2', 128);
     const mk4 = markerMat('4', 128);
+    const deepMarkers = [];
     const marker = (mat, size, x, y, z, ry) => {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
       m.position.set(x, y, z);
@@ -139,9 +140,11 @@ export default class Level02 extends LevelBase {
       const ry = side > 0 ? -Math.PI / 2 : Math.PI / 2;
       marker(mk1, 0.3, x, -0.17, -4.2, ry);
       marker(mk2, 0.3, x, -0.17, -9, ry);
-      marker(mk4, 0.44, x, -0.95, -13.8, ry);          // drowned until the valve turns
+      deepMarkers.push(marker(mk4, 0.44, x, -0.95, -13.8, ry));
     }
-    marker(markerMat('4', 256), 0.66, 0, -1.0, POOL_Z1 + 0.012, 0); // the deep end itself
+    deepMarkers.push(marker(markerMat('4', 256), 0.66, 0, -1.0, POOL_Z1 + 0.012, 0));
+    // Transparent water alone does not conceal the answer at oblique angles.
+    for (const marker of deepMarkers) marker.visible = false;
 
     // a tile missing from the deep end, and the drain that took the water
     const gap = new THREE.Mesh(
@@ -386,8 +389,9 @@ export default class Level02 extends LevelBase {
     this.addCollider(chair);
 
     const note = makeNoteProp();
-    note.position.set(5.72, 1.98, -9.04);
-    note.rotation.y = -Math.PI / 2 + 0.2;
+    // Hang the paper over the front of the high seat, facing the pool.
+    note.position.set(5.45, 1.82, -9);
+    note.rotation.set(0, 0, Math.PI / 2);
     this.add(note);
     this.interact(note, {
       prompt: 'read the note',
@@ -402,7 +406,7 @@ export default class Level02 extends LevelBase {
             'The valve in the filter room still turns, if you ask it.\n\n' +
             '— M.',
         });
-        this.setObjective('the valve in the filter room');
+        if (!this._valveTurned) this.setObjective('the valve in the filter room');
       },
     });
 
@@ -528,6 +532,7 @@ export default class Level02 extends LevelBase {
       once: true,
       distance: 2.6,
       onInteract: () => {
+        this._valveTurned = true;
         this.playSound('switch');
         valve.spinBy(6.5);
         this.setObjective('watch the water go');
@@ -816,6 +821,9 @@ export default class Level02 extends LevelBase {
       const s = Math.min(1, this._drainT / DRAIN_SECS);
       const e = s * s * (3 - 2 * s);
       water.position.y = WATER_HIGH + (WATER_LOW - WATER_HIGH) * e;
+      for (const marker of deepMarkers) {
+        marker.visible = water.position.y < marker.position.y - marker.geometry.parameters.height / 2;
+      }
       if (s >= 1) {
         this._draining = false;
         this.playSound('splash');
@@ -825,7 +833,7 @@ export default class Level02 extends LevelBase {
           title: 'the depth markers',
           body: '1 at the shallow end. 2 partway along.\nAnd under where the water was: 4.',
         });
-        this.setObjective('the padlock on the far door');
+        if (!this._exitOpen) this.setObjective('the padlock on the far door — shallow to deep');
       }
     });
 

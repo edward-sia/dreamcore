@@ -208,7 +208,7 @@ export default class Level08 extends LevelBase {
             'above the tear, the tail of a title:\n' +
             '“…g summer”',
         });
-        this.setObjective('your seat is still down there in the dark');
+        if (!this.hasItem('booth-key') && !this._boothOpen) this.setObjective('your seat is still down there in the dark');
       },
     });
     this._stub = stub;

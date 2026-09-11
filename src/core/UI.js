@@ -4,7 +4,7 @@ export class UI {
   constructor() {
     this.el = {
       hud: $('hud'), crosshair: $('crosshair'), prompt: $('prompt'),
-      objective: $('objective'), items: $('items'), subtitle: $('subtitle'),
+      objective: $('objective'), items: $('items'), subtitle: $('subtitle'), soundCue: $('sound-cue'),
       hintKeys: $('hint-keys'),
       noteHint: $('note-hint'), journalHint: $('journal-hint'), keypadHint: $('keypad-hint'),
       noteOverlay: $('note-overlay'), noteTitle: $('note-title'), noteBody: $('note-body'),
@@ -22,6 +22,11 @@ export class UI {
     this._noteClose = null;
     this._keypadState = null;
     this._subTimer = null;
+    this._subHideTimer = null;
+    this._cueTimer = null;
+    this._objectiveTimer = null;
+    this._keypadTimer = null;
+    this._hintTimer = null;
     this._flashTimer = null;
     this._clues = [];
     this.touchMode = false;
@@ -38,7 +43,6 @@ export class UI {
       if (this.touchMode && this._modal === 'keypad' && e.target === this.el.keypad) this._closeModal();
     });
 
-    setTimeout(() => { this.el.hintKeys.style.opacity = '0'; }, 26000);
   }
 
   get modalOpen() { return this._modal !== null; }
@@ -59,7 +63,14 @@ export class UI {
     this.el.interludeContinue.textContent = 'touch anywhere';
   }
 
-  showHUD(on) { this.el.hud.classList.toggle('hidden', !on); }
+  showHUD(on) {
+    this.el.hud.classList.toggle('hidden', !on);
+    clearTimeout(this._hintTimer);
+    if (on) {
+      this.el.hintKeys.style.opacity = '1';
+      this._hintTimer = setTimeout(() => { this.el.hintKeys.style.opacity = '0'; }, 26000);
+    }
+  }
 
   setPrompt(text) {
     if (text) {
@@ -73,24 +84,32 @@ export class UI {
   }
 
   setObjective(text) {
+    clearTimeout(this._objectiveTimer);
     const el = this.el.objective;
     el.style.opacity = '0';
-    setTimeout(() => {
+    this._objectiveTimer = setTimeout(() => {
       el.textContent = text || '';
       el.style.opacity = '1';
     }, 600);
   }
 
   subtitle(text, duration = 4.5, { voice = 'inner' } = {}) {
+    if (voice === 'cue') {
+      clearTimeout(this._cueTimer);
+      this.el.soundCue.textContent = text;
+      this.el.soundCue.classList.remove('hidden');
+      this._cueTimer = setTimeout(() => this.el.soundCue.classList.add('hidden'), duration * 1000);
+      return;
+    }
     clearTimeout(this._subTimer);
+    clearTimeout(this._subHideTimer);
     const el = this.el.subtitle;
     el.textContent = text;
-    el.classList.toggle('cue', voice === 'cue');
     el.classList.remove('hidden');
     el.style.opacity = '1';
     this._subTimer = setTimeout(() => {
       el.style.opacity = '0';
-      setTimeout(() => el.classList.add('hidden'), 900);
+      this._subHideTimer = setTimeout(() => el.classList.add('hidden'), 900);
     }, duration * 1000);
   }
 
@@ -111,6 +130,7 @@ export class UI {
   // ---------- notes & journal ----------
 
   showNote({ title, body }, onClose = null) {
+    if (this._modal) this._closeModal(true);
     this._noteClose = onClose;
     this.el.noteTitle.textContent = title || '';
     this.el.noteBody.textContent = body || '';
@@ -124,6 +144,7 @@ export class UI {
   clearClues() { this._clues = []; }
 
   toggleJournal() {
+    if (this.canOpenJournal && !this.canOpenJournal()) return;
     if (this._modal === 'journal') { this._closeModal(); return; }
     if (this._modal) return;
     const box = this.el.journalEntries;
@@ -148,9 +169,10 @@ export class UI {
   // ---------- keypad ----------
 
   showKeypad({ label, length = 4, keys = '1234567890', onSubmit, onCancel, onKey }) {
+    if (this._modal) this._closeModal(true);
     this._keypadState = { code: '', length, keys, onSubmit, onCancel, onKey };
     this.el.keypadLabel.textContent = label || '';
-    this.el.keypadDisplay.textContent = '';
+    this.el.keypadDisplay.textContent = '·'.repeat(length);
     const grid = this.el.keypadGrid;
     grid.innerHTML = '';
     for (const k of keys) {
@@ -171,15 +193,16 @@ export class UI {
   _keypadPress(k) {
     const st = this._keypadState;
     if (!st) return;
+    if (k !== null && (!st.keys.includes(k) || st.code.length >= st.length)) return;
+    clearTimeout(this._keypadTimer);
     if (k === null) st.code = st.code.slice(0, -1);
-    else if (!st.keys.includes(k)) return;   // a key this pad does not have
-    else if (st.code.length < st.length) { st.code += k; st.onKey?.(k); }
+    else { st.code += k; st.onKey?.(k); }
     this.el.keypadDisplay.textContent = st.code.padEnd(st.length, '·');
     if (st.code.length === st.length) {
       const code = st.code;
-      setTimeout(() => {
+      this._keypadTimer = setTimeout(() => {
         if (this._keypadState !== st) return;
-        this._closeModal();
+        this._closeModal(false, true);
         st.onSubmit?.(code);
       }, 260);
     }
@@ -189,7 +212,7 @@ export class UI {
   submitKeypad(code) {
     const st = this._keypadState;
     if (!st) return false;
-    this._closeModal();
+    this._closeModal(false, true);
     st.onSubmit?.(code);
     return true;
   }
@@ -278,7 +301,7 @@ export class UI {
     this.onModalChange?.(true);
   }
 
-  _closeModal(silent = false) {
+  _closeModal(silent = false, submitted = false) {
     if (!this._modal) return;
     const kind = this._modal;
     this._modal = null;
@@ -286,9 +309,10 @@ export class UI {
     this.el.journal.classList.add('hidden');
     this.el.keypad.classList.add('hidden');
     if (kind === 'keypad') {
+      clearTimeout(this._keypadTimer);
       const st = this._keypadState;
       this._keypadState = null;
-      if (!silent) st?.onCancel?.();
+      if (!silent && !submitted) st?.onCancel?.();
     }
     if (kind === 'note' && !silent) {
       const cb = this._noteClose;
@@ -302,6 +326,8 @@ export class UI {
 
   _onKey(e) {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    if (this._modal && ['KeyE', 'Enter', 'Space', 'Escape', 'Backspace'].includes(e.code)) e.preventDefault();
+    if (e.repeat) return;
     if (e.code === 'KeyJ') {
       if (this._modal === null || this._modal === 'journal') this.toggleJournal();
       return;

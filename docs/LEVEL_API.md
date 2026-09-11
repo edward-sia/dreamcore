@@ -93,8 +93,13 @@ this.game.interaction.setEnabled(obj, false); // temporarily disable
 - `this.complete()` — call exactly ONCE when solved. Usually gated on walking
   through a final door/threshold via `this.tick(() => ...)` checking
   `this.game.player.position`.
-- `this.after(seconds, fn)` — timeout tied to level lifetime.
-- `this.tick(fn)` — per-frame callback `(dt, t)`.
+- `this.after(seconds, fn)` — callback measured in active room time. It
+  stops during pause, overlays, portrait hold, hidden tabs, and transitions;
+  disposal cancels it. The return value is an opaque handle, not a browser
+  timeout ID. Use `this.cancelAfter(handle)`, never `clearTimeout(handle)`.
+- `this.tick(fn)` — per-frame callback `(dt, t)`. `dt` is the bounded
+  simulation delta; `t` is elapsed active room time. Scale animation changes
+  by `dt`, not by the number of frames. Callbacks do not run behind overlays.
 - `this.track(obj)` — register a prop that has `.update(dt, t)` (doors,
   water, valves, dust, fluorescents).
 
@@ -211,6 +216,9 @@ fallback (a light, dust, a written redundancy) and a `cue()`.
   midpoint; `hours.current`, `hours.changing`, `hours.is(hour)`. Keep the
   instance at `this.hours` (the screenshot tool's `--hour` flag uses it).
   The room plays the `wind` sound and turns its clock's hands itself.
+- `this.rememberHours()` records the clock/placement rules in the journal.
+  Call on the first successful turn of a room's clock. The interaction
+  prompt should say `turn the clock` so the action is discoverable.
 - `makeClockFace({ radius, face, hands })` (props) → a face facing +Z with
   `.setTime(h, m, animate = 1.6)` and `.update(dt)` (track it). Wrap it in a
   case.

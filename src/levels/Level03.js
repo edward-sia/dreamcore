@@ -219,7 +219,7 @@ export default class Level03 extends LevelBase {
             this.playSound('switch');
             key.visible = true;
             this.subtitle('It gives the way it always gave. Dry earth, and a shape you know.', 5);
-            if (!this._readNote) this.setObjective('the stone that doesn’t match');
+            this.setObjective('take the key beneath the stone');
           },
         });
         this.interact(key, {
@@ -281,7 +281,7 @@ export default class Level03 extends LevelBase {
                 '— M.',
             });
             this._readNote = true;
-            this.setObjective('the stone that doesn’t match');
+            if (!this.hasItem('house-key') && !this._unlocked) this.setObjective(this._key.visible ? 'take the key beneath the stone' : 'the stone that doesn’t match');
           },
         });
       } else {

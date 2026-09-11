@@ -265,7 +265,8 @@ export default class Level20 extends LevelBase {
       coat.castShadow = true;
       this.add(coat);
     });
-    // the two front doors, shut — a wardrobe from the room side
+    // Both leaves must open with the back panel to make a walkable passage.
+    this._wardrobeFronts = [];
     for (const [dx, ry] of [[-0.8, 0], [-0.3, Math.PI]]) {
       const wd = this._bareDoor(makeDoor({ width: 0.5, height: 2.0, knob: false, color: '#5a4636' }));
       wd.position.set(dx, 0, 1.18);
@@ -274,7 +275,8 @@ export default class Level20 extends LevelBase {
       const h = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), M.brass);
       h.position.set(0.18, 1.05, ry === 0 ? -0.055 : 0.055);
       wd.panel.add(h);
-      this.add(wd); this.addCollider(wd.panel);
+      this.add(wd); this.track(wd); this.addCollider(wd.panel);
+      this._wardrobeFronts.push({ door: wd, direction: ry === 0 ? 1 : -1 });
     }
     // the dust sheet over it, at the morning
     this._wbSheet = new THREE.Mesh(new THREE.BoxGeometry(1.08, 2.06, 0.07), M.dustSheet);
@@ -404,9 +406,10 @@ export default class Level20 extends LevelBase {
     this._sheetOnMirror.castShadow = this._sheetOnMirror.receiveShadow = true;
     this.add(this._sheetOnMirror);
 
-    // keeping your distance from the bed: you never stand over what is asleep in it
-    const bedKeep = [[-2.1, 0, -1.78], [0.45, 2.2, 1.0]];
-    const westKeep = [[-2.1, 0, 1.0], [-1.05, 2.2, 1.8]];
+    // Keep the sleeper out of reach, leaving a capsule-width route from the
+    // wardrobe around the foot of the bed into the eastern side of the room.
+    const bedKeep = [[-2.1, 0, -1.78], [0.45, 2.2, 0.25]];
+    const westKeep = [[-2.1, 0, 0.25], [-1.05, 2.2, 1.8]];
 
     this.hours.bind('night', {
       objects: [this._starsFull, this._paneNight, this._bedding, this._sheetFold, this._chairN, this._musicBox, this._drawer],
@@ -768,7 +771,7 @@ export default class Level20 extends LevelBase {
     this._clock.rotation.y = -Math.PI / 2;
     this.add(this._clock);
     this._setClock('3:07');
-    this.interact(this._clock, { prompt: 'the clock', onInteract: () => this._flip() });
+    this.interact(this._clock, { prompt: 'turn the clock', onInteract: () => this._flip() });
   }
 
   _setClock(text) {
@@ -889,6 +892,7 @@ export default class Level20 extends LevelBase {
     this.hours.next();
     if (!this._wound) {
       this._wound = true;
+      this.rememberHours();
       this.subtitle('The digits flip. They never did, before.', 5);
       this.setObjective('how she left it, at another hour');
     }
@@ -915,6 +919,10 @@ export default class Level20 extends LevelBase {
       }
       this.game.interaction.setEnabled(this._backPanel, false);   // nothing to say while it stands open
       this._backPanel.setOpen(true, 1);
+      for (const { door, direction } of this._wardrobeFronts) {
+        this.removeColliderOf(door.panel); // remove the closed bounds before the swing
+        door.setOpen(true, direction);
+      }
       if (this._wbBlocker) { this.removeBlocker(this._wbBlocker); this._wbBlocker = null; }
       this.playSound('door');
       this.setObjective('how she left it');
@@ -925,7 +933,7 @@ export default class Level20 extends LevelBase {
       // are standing, so the wait is counted here instead.
       let unseen = 0;
       const shut = this.tick((dt) => {
-        if (pl.position.z >= 1.7 || this.isSeen(this._backPanel)) { unseen = 0; return; }
+        if (pl.position.z >= 0.7 || this.isSeen(this._backPanel)) { unseen = 0; return; }
         unseen += dt;
         if (unseen < 0.4) return;
         shut();
@@ -1144,7 +1152,7 @@ export default class Level20 extends LevelBase {
         return;
       }
       this._answered = true;
-      clearTimeout(this._humT);
+      this.cancelAfter(this._humT);
       this.after(0.8, () => {
         this.playSoundAt('knock', KNOCK_IN, { count: 2, soft: true });
         this.cue('two knocks', new THREE.Vector3(KNOCK_IN.x, KNOCK_IN.y, KNOCK_IN.z));
